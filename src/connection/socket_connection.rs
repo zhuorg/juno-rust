@@ -1,81 +1,49 @@
-use async_std::{
-	io::BufReader,
-	os::unix::net::UnixStream,
-	prelude::{StreamExt, *},
-	task,
-};
+use async_std::{io::BufReader, os::unix::net::UnixStream, prelude::*};
 use async_trait::async_trait;
-use futures::{
-	channel::{
-		mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-		oneshot::{channel, Receiver, Sender},
-	},
-	future::{self, Either},
-};
-use futures_util::sink::SinkExt;
 
 use std::net::Shutdown;
 
 use crate::connection::{BaseConnection, Buffer};
 
 pub struct UnixSocketConnection {
+	client: Option<UnixStream>,
 	socket_path: String,
-	close_sender: Option<Sender<()>>,
-	write_sender: Option<UnboundedSender<Vec<u8>>>,
 }
 
 impl UnixSocketConnection {
 	pub fn new(socket_path: String) -> Self {
 		UnixSocketConnection {
+			client: None,
 			socket_path,
-			close_sender: None,
-			write_sender: None
 		}
 	}
 }
 
 #[async_trait]
 impl BaseConnection for UnixSocketConnection {
-	fn connect_and_listen(&mut self, socket_path: String, data_sender: UnboundedSender<Vec<u8>>) {
-		let (close_sender, close_listener) = channel::<()>();
-		let (write_sender, write_listener) = unbounded::<Vec<u8>>();
+	async fn setup_connection(&mut self) {
+		let result = UnixStream::connect(&self.socket_path).await;
+		if let Err(err) = result {
+			panic!("Error while connecting to socket: {}", err);
+		}
+		self.client = Some(result.unwrap());
+	}
 
-		self.close_sender = Some(close_sender);
-		self.write_sender = Some(write_sender);
+	async fn read_data(&self) -> Option<Buffer> {
+		let reader = BufReader::new(self.client.as_ref().unwrap());
+		let mut lines = reader.lines();
 
-		task::spawn(async {
-			let mut sender = data_sender;
-			let result = UnixStream::connect(socket_path).await;
-			if let Err(err) = result {
-				panic!("Error while connecting to socket: {}", err);
-			}
+		if let Some(Ok(line)) = lines.next().await {
+			return Some(line.into_bytes());
+		}
 
-			let client = result.unwrap();
-			let reader = BufReader::new(client);
-			let mut lines = reader.lines();
-
-			let mut close_future = close_listener;
-			let mut write_future = write_listener;
-
-			while let Either::Left((Some(Ok(line)), next_close_future)) =
-				future::select_all([lines.next(), close_future.receive(), write_future].into_iter()).await
-			{
-				close_future = next_close_future;
-				let result = sender.send(line.as_bytes().to_vec()).await;
-				if let Err(error) = result {
-					println!("Error queing data to reader: {}", error);
-				}
-			}
-			if let Err(err) = client.shutdown(Shutdown::Both) {
-				println!("Error while closing socket: {}", err);
-			}
-		});
+		None
 	}
 
 	async fn close_connection(&mut self) {
-		if let Some(sender) = &self.close_sender {
-			if let Err(err) = sender.send(()) {
-				println!("Error while sending command to close socket");
+		if let Some(client) = &self.client {
+			if let Err(err) = client.shutdown(Shutdown::Both) {
+				println!("Error while closing socket: {}", err);
 			}
 		}
 	}
