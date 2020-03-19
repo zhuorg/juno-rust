@@ -1,11 +1,10 @@
-use crate::connection::{Buffer, OnDataHandler};
+use crate::connection::Buffer;
+use async_trait::async_trait;
+use futures::channel::mpsc::UnboundedSender;
 
+#[async_trait]
 pub trait BaseConnection {
-	fn setup_connection(&mut self);
-	fn close_connection(&mut self);
-	fn send(&mut self, buffer: Buffer);
-
-	fn set_on_data_listener(&mut self, on_data_handler: OnDataHandler);
-
-	fn on_data(&self, data: Buffer);
+	fn connect_and_listen(&mut self, socket_path: String, data_sender: UnboundedSender<Vec<u8>>);
+	async fn close_connection(&mut self);
+	async fn send(&mut self, buffer: Buffer);
 }
