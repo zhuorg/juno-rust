@@ -1,6 +1,4 @@
 extern crate async_std;
-#[macro_use]
-extern crate lazy_static;
 
 mod connection;
 mod gotham_module;
