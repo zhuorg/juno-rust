@@ -192,7 +192,7 @@ impl BaseProtocol for JsonProtocol {
 					request_keys::FUNCTION: function,
 				}),
 
-				BaseMessage::Unknown { request_id: _ } => json!({
+				BaseMessage::Unknown { .. } => json!({
 					request_keys::REQUEST_ID: -1,
 					request_keys::TYPE: 0,
 					request_keys::ERROR: 0

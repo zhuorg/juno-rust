@@ -3,17 +3,47 @@ use crate::{
 	models::BaseMessage,
 	protocol::{BaseProtocol, JsonProtocol},
 };
-use futures::channel::oneshot::{channel, Receiver, Sender};
+use async_std::{
+	prelude::*,
+	sync::{Arc, Mutex},
+	task,
+};
+use futures::channel::{
+	mpsc::UnboundedReceiver,
+	oneshot::{channel, Receiver, Sender},
+};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub struct GothamModule {
 	protocol: Box<dyn BaseProtocol>,
 	connection: Box<dyn BaseConnection>,
 	registered: bool,
 	message_buffer: Vec<u8>,
-	requests: HashMap<String, Sender<Value>>,
+	requests: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+}
+
+async fn on_data_listener(
+	mut receiver: UnboundedReceiver<Buffer>,
+	requests: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+) {
+	let protocol = JsonProtocol::default();
+	while let Some(data) = receiver.next().await {
+		let message = protocol.decode(data.as_slice());
+		let mut requests = requests.lock().await;
+		let request_id = message.get_request_id();
+
+		let value = Value::Null;
+
+		if !requests.contains_key(request_id) {
+			drop(requests);
+			continue;
+		}
+		if let Err(err) = requests.remove(request_id).unwrap().send(value) {
+			println!("Error sending response: {}", err);
+		}
+		drop(requests);
+	}
 }
 
 impl GothamModule {
@@ -23,7 +53,7 @@ impl GothamModule {
 			connection: Box::new(UnixSocketConnection::new(socket_path)),
 			registered: false,
 			message_buffer: vec![],
-			requests: HashMap::new(),
+			requests: Arc::new(Mutex::new(HashMap::new())),
 		}
 	}
 
@@ -33,7 +63,7 @@ impl GothamModule {
 			connection,
 			registered: false,
 			message_buffer: vec![],
-			requests: HashMap::new(),
+			requests: Arc::new(Mutex::new(HashMap::new())),
 		}
 	}
 
@@ -44,25 +74,21 @@ impl GothamModule {
 		dependencies: HashMap<String, String>,
 	) -> Receiver<Value> {
 		self.connection.setup_connection().await;
+		let data_receiver = self.connection.get_data_receiver();
+		let requests = self.requests.clone();
+		task::spawn(async {
+			on_data_listener(data_receiver, requests).await;
+		});
+
 		let initialze_request = self.protocol.initialize(module_id, version, dependencies);
 		self.send_request(initialze_request).await
 	}
-
-	pub async fn read_loop(&self) {
-		while let Some(buffer) = &self.connection.read_data().await {
-			self.on_data_handler(buffer.clone());
-		}
-	}
-
-	async fn read_loop_until(&self, request_id: String) {}
 
 	async fn send_request(&mut self, request: BaseMessage) -> Receiver<Value> {
 		if let BaseMessage::RegisterModuleRequest { .. } = request {
 			if self.registered {
 				let (sender, receiver) = channel::<Value>();
-				if let Err(err) = sender.send(Value::Null) {
-					println!("Error sending to oneshot mpsc channel: {}", err);
-				}
+				sender.send(Value::Null).unwrap();
 
 				return receiver;
 			}
@@ -78,12 +104,10 @@ impl GothamModule {
 		let (sender, receiver) = channel::<Value>();
 
 		self.requests
+			.lock()
+			.await
 			.insert(request.get_request_id().clone(), sender);
 
 		receiver
-	}
-
-	fn on_data_handler(&self, data: Buffer) {
-		let message = self.protocol.decode(data.as_slice());
 	}
 }
