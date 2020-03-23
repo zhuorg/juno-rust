@@ -10,3 +10,6 @@ pub mod request_keys {
 	pub const ARGUMENTS: &str = "arguments";
 	pub const DATA: &str = "data";
 }
+
+pub const CALL_FUNCTION_REQUEST_ID: &str = "call_function_internal";
+pub const TRIGGER_HOOK_REQUEST_ID: &str = "trigger_hook_internal";

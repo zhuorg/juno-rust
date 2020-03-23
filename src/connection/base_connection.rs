@@ -1,6 +1,6 @@
 use crate::connection::Buffer;
 use async_trait::async_trait;
-use futures::channel::mpsc::UnboundedReceiver;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[async_trait]
 pub trait BaseConnection {
@@ -9,4 +9,5 @@ pub trait BaseConnection {
 	async fn send(&mut self, buffer: Buffer);
 
 	fn get_data_receiver(&mut self) -> UnboundedReceiver<Buffer>;
+	fn clone_write_sender(&self) -> UnboundedSender<Buffer>;
 }

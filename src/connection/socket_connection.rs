@@ -135,4 +135,8 @@ impl BaseConnection for UnixSocketConnection {
 	fn get_data_receiver(&mut self) -> UnboundedReceiver<Buffer> {
 		self.read_data_receiver.take().unwrap()
 	}
+
+	fn clone_write_sender(&self) -> UnboundedSender<Buffer> {
+		self.write_data_sender.as_ref().unwrap().clone()
+	}
 }

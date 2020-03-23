@@ -1,4 +1,7 @@
 extern crate async_std;
+extern crate serde_json;
+extern crate futures;
+extern crate futures_util;
 
 mod connection;
 mod gotham_module;
