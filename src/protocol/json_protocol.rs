@@ -1,18 +1,130 @@
+use crate::{
+	connection::Buffer,
+	models::BaseMessage,
+	protocol::base_protocol::BaseProtocol,
+	utils::request_keys,
+};
+use serde_json::{from_slice, json, Result, Value};
 use std::collections::HashMap;
 
-use crate::{models::BaseMessage, protocol::BaseProtocol, utils::request_keys};
-
-use serde_json::{from_slice, json, Result, Value};
-
-pub struct JsonProtocol {
-	module_id: String,
+pub fn default() -> BaseProtocol {
+	BaseProtocol::JsonProtocol {
+		module_id: String::default(),
+	}
 }
 
-impl JsonProtocol {
-	pub fn default() -> Self {
-		JsonProtocol {
-			module_id: String::default(),
-		}
+pub fn from(other: &BaseProtocol) -> BaseProtocol {
+	match other {
+		BaseProtocol::JsonProtocol { module_id } => BaseProtocol::JsonProtocol {
+			module_id: module_id.clone(),
+		},
+		_ => panic!("BaseProtocol tried to decode a non-JsonProtocol as a JsonProtocol"),
+	}
+}
+
+pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
+	match protocol {
+		BaseProtocol::JsonProtocol { .. } => format!(
+			"{}\n",
+			match req {
+				BaseMessage::RegisterModuleRequest {
+					request_id,
+					module_id,
+					version,
+					dependencies,
+				} => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::MODULE_ID: module_id,
+					request_keys::VERSION: version,
+					request_keys::DEPENDENCIES: dependencies,
+				}),
+
+				BaseMessage::RegisterModuleResponse { request_id } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+				}),
+
+				BaseMessage::FunctionCallRequest {
+					request_id,
+					function,
+					arguments,
+				} => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::FUNCTION: function,
+					request_keys::ARGUMENTS: arguments,
+				}),
+
+				BaseMessage::FunctionCallResponse { request_id, data } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::DATA: data,
+				}),
+
+				BaseMessage::RegisterHookRequest { request_id, hook } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::HOOK: hook,
+				}),
+
+				BaseMessage::ListenHookResponse { request_id } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+				}),
+
+				BaseMessage::TriggerHookRequest { request_id, hook } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::HOOK: hook,
+				}),
+
+				BaseMessage::TriggerHookResponse { request_id } => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+				}),
+
+				BaseMessage::DeclareFunctionRequest {
+					request_id,
+					function,
+				} => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::FUNCTION: function,
+				}),
+
+				BaseMessage::DeclareFunctionResponse {
+					request_id,
+					function,
+				} => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::FUNCTION: function,
+				}),
+
+				BaseMessage::Unknown { .. } => json!({
+					request_keys::REQUEST_ID: -1,
+					request_keys::TYPE: 0,
+					request_keys::ERROR: 0
+				}),
+			}
+			.to_string()
+		)
+		.as_bytes()
+		.to_vec(),
+		_ => panic!("BaseProtocol tried to decode a non-JsonProtocol as a JsonProtocol"),
+	}
+}
+
+pub fn decode(protocol: &BaseProtocol, data: &[u8]) -> BaseMessage {
+	match protocol {
+		BaseProtocol::JsonProtocol { .. } => match decode_internal(data) {
+			Some(msg) => msg,
+			None => BaseMessage::Unknown {
+				request_id: String::default(),
+			},
+		},
+		_ => panic!("BaseProtocol tried to decode a non-JsonProtocol as a JsonProtocol"),
 	}
 }
 
@@ -109,115 +221,5 @@ fn decode_internal(data: &[u8]) -> Option<BaseMessage> {
 		Some(BaseMessage::Unknown {
 			request_id: String::default(),
 		})
-	}
-}
-
-impl BaseProtocol for JsonProtocol {
-	fn encode(&self, req: &BaseMessage) -> Vec<u8> {
-		format!(
-			"{}\n",
-			match req {
-				BaseMessage::RegisterModuleRequest {
-					request_id,
-					module_id,
-					version,
-					dependencies,
-				} => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::MODULE_ID: module_id,
-					request_keys::VERSION: version,
-					request_keys::DEPENDENCIES: dependencies,
-				}),
-
-				BaseMessage::RegisterModuleResponse { request_id } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-				}),
-
-				BaseMessage::FunctionCallRequest {
-					request_id,
-					function,
-					arguments,
-				} => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::FUNCTION: function,
-					request_keys::ARGUMENTS: arguments,
-				}),
-
-				BaseMessage::FunctionCallResponse { request_id, data } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::DATA: data,
-				}),
-
-				BaseMessage::RegisterHookRequest { request_id, hook } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::HOOK: hook,
-				}),
-
-				BaseMessage::ListenHookResponse { request_id } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-				}),
-
-				BaseMessage::TriggerHookRequest { request_id, hook } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::HOOK: hook,
-				}),
-
-				BaseMessage::TriggerHookResponse { request_id } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-				}),
-
-				BaseMessage::DeclareFunctionRequest {
-					request_id,
-					function,
-				} => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::FUNCTION: function,
-				}),
-
-				BaseMessage::DeclareFunctionResponse {
-					request_id,
-					function,
-				} => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::FUNCTION: function,
-				}),
-
-				BaseMessage::Unknown { .. } => json!({
-					request_keys::REQUEST_ID: -1,
-					request_keys::TYPE: 0,
-					request_keys::ERROR: 0
-				}),
-			}
-			.to_string()
-		)
-		.as_bytes()
-		.to_vec()
-	}
-
-	fn decode(&self, data: &[u8]) -> BaseMessage {
-		match decode_internal(data) {
-			Some(msg) => msg,
-			None => BaseMessage::Unknown {
-				request_id: String::default(),
-			},
-		}
-	}
-
-	fn get_module_id(&self) -> &String {
-		&self.module_id
-	}
-
-	fn set_module_id(&mut self, value: String) {
-		self.module_id = value;
 	}
 }

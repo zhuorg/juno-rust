@@ -2,7 +2,6 @@ use serde_json::{Map, Value};
 
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub enum BaseMessage {
 	RegisterModuleRequest {
 		request_id: String,

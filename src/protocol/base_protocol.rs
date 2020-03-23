@@ -1,25 +1,57 @@
-use serde_json::{Map, Value};
-
 use std::{
 	collections::HashMap,
 	time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::models::*;
+use crate::{connection::Buffer, models::BaseMessage, protocol::json_protocol};
 
-pub trait BaseProtocol {
-	fn generate_request_id(&self) -> String {
-		let time = SystemTime::now()
-			.duration_since(UNIX_EPOCH)
-			.expect("Time went backwards. Wtf?")
-			.as_nanos();
-		format!("{}-{}", &self.get_module_id(), time)
+use serde_json::{Map, Value};
+
+pub enum BaseProtocol {
+	JsonProtocol { module_id: String },
+	MsgPackProtocol { module_id: String },
+}
+
+impl BaseProtocol {
+	pub fn default() -> Self {
+		json_protocol::default()
 	}
 
-	fn get_module_id(&self) -> &String;
-	fn set_module_id(&mut self, module_id: String);
+	pub fn from(other: &Self) -> Self {
+		match other {
+			BaseProtocol::JsonProtocol { .. } => json_protocol::from(other),
+			_ => panic!("Currently, only JsonProtocol is supported"),
+		}
+	}
 
-	fn initialize(
+	pub fn generate_request_id(&self) -> String {
+		format!(
+			"{}-{}",
+			self.get_module_id(),
+			SystemTime::now()
+				.duration_since(UNIX_EPOCH)
+				.expect("Time went backwards. Wtf?")
+				.as_nanos()
+		)
+	}
+
+	pub fn get_module_id(&self) -> &String {
+		match self {
+			BaseProtocol::JsonProtocol { module_id } => module_id,
+			_ => panic!("Currently, only JsonProtocol is supported"),
+		}
+	}
+
+	pub fn set_module_id(&mut self, new_module_id: String) {
+		match self {
+			BaseProtocol::JsonProtocol { ref mut module_id } => {
+				*module_id = new_module_id;
+			}
+			_ => panic!("Currently, only JsonProtocol is supported"),
+		}
+	}
+
+	pub fn initialize(
 		&mut self,
 		module_id: String,
 		version: String,
@@ -34,28 +66,28 @@ pub trait BaseProtocol {
 		}
 	}
 
-	fn register_hook(&self, hook: String) -> BaseMessage {
+	pub fn register_hook(&self, hook: String) -> BaseMessage {
 		BaseMessage::RegisterHookRequest {
 			request_id: self.generate_request_id(),
 			hook,
 		}
 	}
 
-	fn trigger_hook(&self, hook: String) -> BaseMessage {
+	pub fn trigger_hook(&self, hook: String) -> BaseMessage {
 		BaseMessage::TriggerHookRequest {
 			request_id: self.generate_request_id(),
 			hook,
 		}
 	}
 
-	fn declare_function(&self, function: String) -> BaseMessage {
+	pub fn declare_function(&self, function: String) -> BaseMessage {
 		BaseMessage::DeclareFunctionRequest {
 			request_id: self.generate_request_id(),
 			function,
 		}
 	}
 
-	fn call_function(&self, function: String, arguments: Map<String, Value>) -> BaseMessage {
+	pub fn call_function(&self, function: String, arguments: Map<String, Value>) -> BaseMessage {
 		BaseMessage::FunctionCallRequest {
 			request_id: self.generate_request_id(),
 			function,
@@ -63,6 +95,17 @@ pub trait BaseProtocol {
 		}
 	}
 
-	fn encode(&self, req: &BaseMessage) -> Vec<u8>;
-	fn decode(&self, data: &[u8]) -> BaseMessage;
+	pub fn encode(&self, req: &BaseMessage) -> Buffer {
+		match self {
+			BaseProtocol::JsonProtocol { .. } => json_protocol::encode(&self, req),
+			_ => panic!("Currently, only JsonProtocol is supported"),
+		}
+	}
+
+	pub fn decode(&self, data: &[u8]) -> BaseMessage {
+		match self {
+			BaseProtocol::JsonProtocol { .. } => json_protocol::decode(&self, data),
+			_ => panic!("Currently, only JsonProtocol is supported"),
+		}
+	}
 }

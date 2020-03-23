@@ -12,4 +12,4 @@ pub use connection::{BaseConnection, Buffer, UnixSocketConnection};
 
 pub use models::BaseMessage;
 
-pub use protocol::{BaseProtocol, JsonProtocol};
+pub use protocol::BaseProtocol;
