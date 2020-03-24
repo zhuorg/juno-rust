@@ -2,12 +2,18 @@ use async_std::{io::BufReader, os::unix::net::UnixStream, prelude::*, task};
 use async_trait::async_trait;
 
 use futures::{
-	channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+	channel::{
+		mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+		oneshot::{channel, Sender},
+	},
 	future::{self, Either},
 };
 use futures_util::SinkExt;
 
-use crate::connection::{BaseConnection, Buffer};
+use crate::{
+	connection::{BaseConnection, Buffer},
+	utils::Error,
+};
 
 pub struct UnixSocketConnection {
 	read_data_receiver: Option<UnboundedReceiver<Vec<u8>>>,
@@ -29,15 +35,18 @@ impl UnixSocketConnection {
 
 async fn read_data_from_socket(
 	socket_path: String,
+	init_sender: Sender<Result<(), Error>>,
 	mut read_sender: UnboundedSender<Vec<u8>>,
 	mut write_receiver: UnboundedReceiver<Vec<u8>>,
 	mut close_receiver: UnboundedReceiver<()>,
 ) {
 	let result = UnixStream::connect(socket_path).await;
 	if let Err(err) = result {
-		panic!("Error while connecting to socket: {}", err);
+		init_sender.send(Err(Error::Internal(format!("{}", err)))).unwrap_or(());
+		return;
 	}
 	let client = result.unwrap();
+	init_sender.send(Ok(())).unwrap_or(());
 	let reader = BufReader::new(&client);
 	let mut lines = reader.lines();
 	let mut read_future = lines.next();
@@ -91,10 +100,11 @@ async fn read_data_from_socket(
 
 #[async_trait]
 impl BaseConnection for UnixSocketConnection {
-	async fn setup_connection(&mut self) {
+	async fn setup_connection(&mut self) -> Result<(), Error> {
 		let (read_data_sender, read_data_receiver) = unbounded::<Vec<u8>>();
 		let (write_data_sender, write_data_receiver) = unbounded::<Vec<u8>>();
 		let (close_sender, close_receiver) = unbounded::<()>();
+		let (init_sender, init_receiver) = channel::<Result<(), Error>>();
 
 		self.read_data_receiver = Some(read_data_receiver);
 		self.write_data_sender = Some(write_data_sender);
@@ -104,12 +114,15 @@ impl BaseConnection for UnixSocketConnection {
 		task::spawn(async {
 			read_data_from_socket(
 				socket_path,
+				init_sender,
 				read_data_sender,
 				write_data_receiver,
 				close_receiver,
 			)
 			.await;
 		});
+
+		init_receiver.await.unwrap()
 	}
 
 	async fn close_connection(&mut self) {

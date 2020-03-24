@@ -2,7 +2,7 @@ use crate::{
 	connection::{BaseConnection, Buffer, UnixSocketConnection},
 	models::BaseMessage,
 	protocol::BaseProtocol,
-	utils,
+	utils::{self, Error, Result},
 };
 use async_std::{
 	prelude::*,
@@ -11,23 +11,23 @@ use async_std::{
 };
 use futures::channel::{
 	mpsc::{UnboundedReceiver, UnboundedSender},
-	oneshot::{channel, Receiver, Sender},
+	oneshot::{channel, Sender},
 };
 use futures_util::sink::SinkExt;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
-type SharableRequestList = Arc<Mutex<HashMap<String, Sender<Value>>>>;
-type SharableFunctionList = Arc<Mutex<HashMap<String, fn(Map<String, Value>) -> Value>>>;
-type SharableHookList = Arc<Mutex<HashMap<String, Vec<fn(Value)>>>>;
+type ArcRequestList = Arc<Mutex<HashMap<String, Sender<Result<Value>>>>>;
+type ArcFunctionList = Arc<Mutex<HashMap<String, fn(Map<String, Value>) -> Value>>>;
+type ArcHookListenerList = Arc<Mutex<HashMap<String, Vec<fn(Value)>>>>;
 
 pub struct GothamModule {
 	protocol: BaseProtocol,
 	connection: Box<dyn BaseConnection>,
-	requests: SharableRequestList,
-	functions: SharableFunctionList,
-	hook_listeners: SharableHookList,
-	message_buffer: Vec<u8>,
+	requests: ArcRequestList,
+	functions: ArcFunctionList,
+	hook_listeners: ArcHookListenerList,
+	message_buffer: Buffer,
 	registered: bool,
 }
 
@@ -61,43 +61,43 @@ impl GothamModule {
 		module_id: String,
 		version: String,
 		dependencies: HashMap<String, String>,
-	) {
-		self.setup_connections().await;
+	) -> Result<()> {
+		self.setup_connections().await?;
 
 		let request = self.protocol.initialize(module_id, version, dependencies);
-		self.send_request(request)
-			.await
-			.await
-			.unwrap_or(Value::Null);
+		self.send_request(request).await?;
+
 		self.registered = true;
+		Ok(())
 	}
 
 	pub async fn declare_function(
 		&mut self,
 		fn_name: String,
 		function: fn(Map<String, Value>) -> Value,
-	) {
+	) -> Result<()> {
 		self.functions
 			.lock()
 			.await
 			.insert(fn_name.clone(), function);
 
 		let request = self.protocol.declare_function(fn_name);
-		self.send_request(request)
-			.await
-			.await
-			.unwrap_or(Value::Null);
+		self.send_request(request).await?;
+		Ok(())
 	}
 
-	pub async fn call_function(&mut self, fn_name: String, args: Map<String, Value>) -> Value {
+	pub async fn call_function(
+		&mut self,
+		fn_name: String,
+		args: Map<String, Value>,
+	) -> Result<Value> {
+		self.ensure_registered()?;
 		let request = self.protocol.call_function(fn_name, args);
-		self.send_request(request)
-			.await
-			.await
-			.unwrap_or(Value::Null)
+		self.send_request(request).await
 	}
 
-	pub async fn register_hook(&mut self, hook: String, callback: fn(Value)) {
+	pub async fn register_hook(&mut self, hook: String, callback: fn(Value)) -> Result<()> {
+		self.ensure_registered()?;
 		let mut hook_listeners = self.hook_listeners.lock().await;
 		if hook_listeners.contains_key(&hook) {
 			hook_listeners.get_mut(&hook).unwrap().push(callback);
@@ -107,26 +107,29 @@ impl GothamModule {
 		drop(hook_listeners);
 
 		let request = self.protocol.register_hook(hook);
-		self.send_request(request)
-			.await
-			.await
-			.unwrap_or(Value::Null);
+		self.send_request(request).await?;
+		Ok(())
 	}
 
-	pub async fn trigger_hook(&mut self, hook: String) {
+	pub async fn trigger_hook(&mut self, hook: String) -> Result<()> {
 		let request = self.protocol.trigger_hook(hook);
-		self.send_request(request)
-			.await
-			.await
-			.unwrap_or(Value::Null);
+		self.send_request(request).await?;
+		Ok(())
 	}
 
 	pub async fn close(&mut self) {
 		self.connection.close_connection().await;
 	}
 
-	async fn setup_connections(&mut self) {
-		self.connection.setup_connection().await;
+	fn ensure_registered(&self) -> Result<()> {
+		if !self.registered {
+			return Err(Error::Internal(String::from("Module not registered. Did you .await the call to initialize?")));
+		}
+		Ok(())
+	}
+
+	async fn setup_connections(&mut self) -> Result<()> {
+		self.connection.setup_connection().await?;
 
 		// Setup the multi-threaded read-write loop
 		let data_receiver = self.connection.get_data_receiver();
@@ -138,17 +141,29 @@ impl GothamModule {
 
 		// Run the read-write loop
 		task::spawn(async {
-			on_data_listener(data_receiver, protocol, requests, functions, hook_listeners, write_sender).await;
+			on_data_listener(
+				data_receiver,
+				protocol,
+				requests,
+				functions,
+				hook_listeners,
+				write_sender,
+			)
+			.await;
 		});
+
+		Ok(())
 	}
 
-	async fn send_request(&mut self, request: BaseMessage) -> Receiver<Value> {
+	async fn send_request(&mut self, request: BaseMessage) -> Result<Value> {
 		if let BaseMessage::RegisterModuleRequest { .. } = request {
 			if self.registered {
-				let (sender, receiver) = channel::<Value>();
-				sender.send(Value::Null).unwrap();
+				let (sender, receiver) = channel::<Result<Value>>();
+				sender.send(Ok(Value::Null)).unwrap();
 
-				return receiver;
+				return receiver.await.unwrap_or(Err(Error::Internal(String::from(
+					"Request sender was dropped before data could be retrieved",
+				))));
 			}
 		}
 
@@ -159,23 +174,25 @@ impl GothamModule {
 			self.message_buffer.append(&mut encoded);
 		}
 
-		let (sender, receiver) = channel::<Value>();
+		let (sender, receiver) = channel::<Result<Value>>();
 
 		self.requests
 			.lock()
 			.await
 			.insert(request.get_request_id().clone(), sender);
 
-		receiver
+		receiver.await.unwrap_or(Err(Error::Internal(String::from(
+			"Request sender was dropped before data could be retrieved",
+		))))
 	}
 }
 
 async fn on_data_listener(
 	mut receiver: UnboundedReceiver<Buffer>,
 	protocol: BaseProtocol,
-	requests: SharableRequestList,
-	functions: SharableFunctionList,
-	hook_listeners: SharableHookList,
+	requests: ArcRequestList,
+	functions: ArcFunctionList,
+	hook_listeners: ArcHookListenerList,
 	mut write_sender: UnboundedSender<Buffer>,
 ) {
 	while let Some(data) = receiver.next().await {
@@ -183,45 +200,47 @@ async fn on_data_listener(
 		let mut requests = requests.lock().await;
 		let request_id = message.get_request_id().clone();
 
-		if request_id == utils::CALL_FUNCTION_REQUEST_ID
-			|| request_id == utils::TRIGGER_HOOK_REQUEST_ID
-		{
-			drop(requests);
-			continue;
-		}
-
 		let value = match message {
-			BaseMessage::FunctionCallResponse { data, .. } => data,
+			BaseMessage::FunctionCallResponse { data, .. } => Ok(data),
 			BaseMessage::FunctionCallRequest { .. } => {
 				let result = execute_function_call(message, &functions).await;
-				let write_buffer = protocol.encode(&BaseMessage::FunctionCallResponse {
-					request_id: request_id.clone(),
-					data: result,
-				});
+				let write_buffer = match result {
+					Ok(value) => protocol.encode(&BaseMessage::FunctionCallResponse {
+						request_id: request_id.clone(),
+						data: value,
+					}),
+					Err(error) => protocol.encode(&BaseMessage::Error {
+						request_id: request_id.clone(),
+						error: match error {
+							Error::Internal(_) => 0,
+							Error::FromGotham(error_code) => error_code,
+						},
+					}),
+				};
 				if let Err(err) = write_sender.send(write_buffer).await {
 					println!("Error writing back result of function call: {}", err);
 				}
-				Value::Null
+				Ok(Value::Null)
 			}
-			BaseMessage::TriggerHookResponse { .. } => execute_hook_triggered(message, &hook_listeners).await,
-			_ => Value::Null,
+			BaseMessage::TriggerHookResponse { .. } => {
+				execute_hook_triggered(message, &hook_listeners).await
+			}
+			BaseMessage::Error { error, .. } => Err(Error::FromGotham(error)),
+			_ => Ok(Value::Null),
 		};
 
 		if !requests.contains_key(&request_id) {
 			drop(requests);
 			continue;
 		}
-		if let Err(err) = requests.remove(&request_id).unwrap().send(value) {
-			println!("Error sending response: {}", err);
+		if let Err(_) = requests.remove(&request_id).unwrap().send(value) {
+			println!("Error sending response of requestId: {}", &request_id);
 		}
 		drop(requests);
 	}
 }
 
-async fn execute_function_call(
-	message: BaseMessage,
-	functions: &SharableFunctionList,
-) -> Value {
+async fn execute_function_call(message: BaseMessage, functions: &ArcFunctionList) -> Result<Value> {
 	if let BaseMessage::FunctionCallRequest {
 		function,
 		arguments,
@@ -230,9 +249,9 @@ async fn execute_function_call(
 	{
 		let functions = functions.lock().await;
 		if !functions.contains_key(&function) {
-			todo!("Wtf do I do now? Need to propogate errors. How do I do that?");
+			return Err(Error::FromGotham(utils::errors::UNKNOWN_FUNCTION));
 		}
-		functions[&function](arguments)
+		Ok(functions[&function](arguments))
 	} else {
 		panic!("Cannot execute function from a request that wasn't a FunctionCallRequest!");
 	}
@@ -240,8 +259,8 @@ async fn execute_function_call(
 
 async fn execute_hook_triggered(
 	message: BaseMessage,
-	hook_listeners: &SharableHookList,
-) -> Value {
+	hook_listeners: &ArcHookListenerList,
+) -> Result<Value> {
 	if let BaseMessage::TriggerHookRequest { hook, .. } = message {
 		let hook_listeners = hook_listeners.lock().await;
 		if !hook_listeners.contains_key(&hook) {
@@ -253,5 +272,5 @@ async fn execute_hook_triggered(
 	} else {
 		panic!("Cannot execute function from a request that wasn't a FunctionCallRequest!");
 	}
-	Value::Null
+	Ok(Value::Null)
 }

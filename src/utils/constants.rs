@@ -11,5 +11,15 @@ pub mod request_keys {
 	pub const DATA: &str = "data";
 }
 
-pub const CALL_FUNCTION_REQUEST_ID: &str = "call_function_internal";
-pub const TRIGGER_HOOK_REQUEST_ID: &str = "trigger_hook_internal";
+#[allow(dead_code)]
+pub mod errors {
+	pub const MALFORMED_REQUEST: u32 = 0;
+
+	pub const INVALID_REQUEST_ID: u32 = 1;
+	pub const UNKNOWN_REQUEST: u32 = 2;
+	pub const UNREGISTERED_MODULE: u32 = 3;
+	pub const UNKNOWN_MODULE: u32 = 4;
+	pub const UNKNOWN_FUNCTION: u32 = 5;
+	pub const INVALID_MODULE_ID: u32 = 6;
+	pub const DUPLICATE_MODULE: u32 = 7;
+}

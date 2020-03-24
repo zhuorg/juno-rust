@@ -43,6 +43,10 @@ pub enum BaseMessage {
 		request_id: String,
 		function: String,
 	},
+	Error {
+		request_id: String,
+		error: u32,
+	},
 	Unknown {
 		request_id: String,
 	},
@@ -51,7 +55,7 @@ pub enum BaseMessage {
 impl BaseMessage {
 	pub fn get_type(&self) -> u64 {
 		match &self {
-			BaseMessage::Unknown { .. } => 0,
+			BaseMessage::Unknown { .. } | BaseMessage::Error { .. } => 0,
 			BaseMessage::RegisterModuleRequest { .. } => 1,
 			BaseMessage::RegisterModuleResponse { .. } => 2,
 			BaseMessage::FunctionCallRequest { .. } => 3,
@@ -68,6 +72,7 @@ impl BaseMessage {
 	pub fn get_request_id(&self) -> &String {
 		match &self {
 			BaseMessage::Unknown { request_id } => request_id,
+			BaseMessage::Error { request_id, .. } => request_id,
 			BaseMessage::RegisterModuleRequest { request_id, .. } => request_id,
 			BaseMessage::RegisterModuleResponse { request_id, .. } => request_id,
 			BaseMessage::FunctionCallRequest { request_id, .. } => request_id,

@@ -103,9 +103,18 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 				}),
 
 				BaseMessage::Unknown { .. } => json!({
-					request_keys::REQUEST_ID: -1,
-					request_keys::TYPE: 0,
+					request_keys::REQUEST_ID: "undefined",
+					request_keys::TYPE: req.get_type(),
 					request_keys::ERROR: 0
+				}),
+
+				BaseMessage::Error {
+					request_id,
+					error
+				} => json!({
+					request_keys::REQUEST_ID: request_id,
+					request_keys::TYPE: req.get_type(),
+					request_keys::ERROR: error
 				}),
 			}
 			.to_string()

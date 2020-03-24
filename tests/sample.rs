@@ -9,14 +9,16 @@ fn sample() {
 		let mut module = GothamModule::default(String::from("../gotham.sock"));
 		module
 			.initialize("module1".to_string(), "1.0.0".to_string(), HashMap::new())
-			.await;
+			.await
+			.unwrap();
 		println!("initialized");
 		module
 			.declare_function("print_hello".to_string(), |_| {
 				println!("Hello");
 				serde_json::Value::Null
 			})
-			.await;
+			.await
+			.unwrap();
 		loop {
 			task::sleep(std::time::Duration::from_millis(1000)).await;
 		}
@@ -25,10 +27,12 @@ fn sample() {
 		let mut module = GothamModule::default(String::from("../gotham.sock"));
 		module
 			.initialize("module2".to_string(), "1.0.0".to_string(), HashMap::new())
-			.await;
+			.await
+			.unwrap();
 		module
 			.call_function("module1.print_hello".to_string(), Map::new())
-			.await;
+			.await
+			.unwrap();
 		loop {
 			task::sleep(std::time::Duration::from_millis(1000)).await;
 		}

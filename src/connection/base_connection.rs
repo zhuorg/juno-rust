@@ -1,10 +1,10 @@
-use crate::connection::Buffer;
+use crate::{connection::Buffer, utils::Error};
 use async_trait::async_trait;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[async_trait]
 pub trait BaseConnection {
-	async fn setup_connection(&mut self);
+	async fn setup_connection(&mut self) -> Result<(), Error>;
 	async fn close_connection(&mut self);
 	async fn send(&mut self, buffer: Buffer);
 
