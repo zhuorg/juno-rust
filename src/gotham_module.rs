@@ -123,7 +123,9 @@ impl GothamModule {
 
 	fn ensure_registered(&self) -> Result<()> {
 		if !self.registered {
-			return Err(Error::Internal(String::from("Module not registered. Did you .await the call to initialize?")));
+			return Err(Error::Internal(String::from(
+				"Module not registered. Did you .await the call to initialize?",
+			)));
 		}
 		Ok(())
 	}

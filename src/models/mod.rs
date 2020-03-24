@@ -1,3 +1,3 @@
 mod messages;
 
-pub use messages::*;
+pub use messages::BaseMessage;

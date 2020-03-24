@@ -42,7 +42,9 @@ async fn read_data_from_socket(
 ) {
 	let result = UnixStream::connect(socket_path).await;
 	if let Err(err) = result {
-		init_sender.send(Err(Error::Internal(format!("{}", err)))).unwrap_or(());
+		init_sender
+			.send(Err(Error::Internal(format!("{}", err))))
+			.unwrap_or(());
 		return;
 	}
 	let client = result.unwrap();

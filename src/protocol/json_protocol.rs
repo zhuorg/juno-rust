@@ -108,10 +108,7 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 					request_keys::ERROR: 0
 				}),
 
-				BaseMessage::Error {
-					request_id,
-					error
-				} => json!({
+				BaseMessage::Error { request_id, error } => json!({
 					request_keys::REQUEST_ID: request_id,
 					request_keys::TYPE: req.get_type(),
 					request_keys::ERROR: error
