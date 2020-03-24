@@ -163,9 +163,12 @@ impl GothamModule {
 				let (sender, receiver) = channel::<Result<Value>>();
 				sender.send(Ok(Value::Null)).unwrap();
 
-				return receiver.await.unwrap_or(Err(Error::Internal(String::from(
-					"Request sender was dropped before data could be retrieved",
-				))));
+				return match receiver.await {
+					Ok(value) => value,
+					Err(_) => Err(Error::Internal(String::from(
+						"Request sender was dropped before data could be retrieved",
+					))),
+				};
 			}
 		}
 
@@ -183,9 +186,12 @@ impl GothamModule {
 			.await
 			.insert(request.get_request_id().clone(), sender);
 
-		receiver.await.unwrap_or(Err(Error::Internal(String::from(
-			"Request sender was dropped before data could be retrieved",
-		))))
+		match receiver.await {
+			Ok(value) => value,
+			Err(_) => Err(Error::Internal(String::from(
+				"Request sender was dropped before data could be retrieved",
+			))),
+		}
 	}
 }
 
@@ -235,7 +241,7 @@ async fn on_data_listener(
 			drop(requests);
 			continue;
 		}
-		if let Err(_) = requests.remove(&request_id).unwrap().send(value) {
+		if requests.remove(&request_id).unwrap().send(value).is_err() {
 			println!("Error sending response of requestId: {}", &request_id);
 		}
 		drop(requests);

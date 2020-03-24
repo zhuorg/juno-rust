@@ -21,7 +21,7 @@ async fn should_connect_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (_, _) = futures::future::join(connection_listener, connection.setup_connection()).await;
+	let (..) = futures::future::join(connection_listener, connection.setup_connection()).await;
 
 	remove_file("./temp-1.sock").await?;
 
