@@ -3,6 +3,10 @@ authors = ["Rakshith Ravi <rakshith.ravi@gmx.com>"]
 edition = "2018"
 name = "gotham"
 version = "0.1.0"
+license = "MIT"
+description = "A helper rust library for the gotham microservices framework"
+homepage = "github.com/bytesonus/gotham-rust"
+repository = "github.com/bytesonus/gotham-rust"
 
 [dependencies]
 async-std = "1.4.0"
