@@ -118,3 +118,56 @@ async fn should_connect_and_send_data_from_cloned_sender_async() -> Result<()> {
 
 	Ok(())
 }
+
+#[test]
+#[should_panic]
+fn should_send_data_without_connection_and_panic() {
+	let mut connection = UnixSocketConnection::new(String::from("./test.sock"));
+	task::block_on(connection.send(vec![]));
+}
+
+#[test]
+#[should_panic]
+fn should_close_connection_without_setup_and_panic() {
+	let mut connection = UnixSocketConnection::new(String::from("./test.sock"));
+	task::block_on(connection.close_connection());
+}
+
+#[test]
+#[should_panic]
+fn should_get_data_receiver_without_setup_and_panic() {
+	let mut connection = UnixSocketConnection::new(String::from("./test.sock"));
+	connection.get_data_receiver();
+}
+
+#[test]
+#[should_panic]
+fn should_clone_write_sender_without_setup_and_panic() {
+	let connection = UnixSocketConnection::new(String::from("./test.sock"));
+	connection.clone_write_sender();
+}
+
+#[test]
+#[should_panic]
+fn should_setup_connection_twice_and_panic() {
+	let handle = std::thread::spawn(|| {
+		task::block_on(should_setup_connection_twice_and_panic_async()).unwrap();
+	}).join();
+	task::block_on(remove_file("./temp-5.sock")).unwrap();
+	handle.unwrap();
+}
+
+async fn should_setup_connection_twice_and_panic_async() -> Result<()> {
+	// Setup to try and connect to socket server
+	let mut connection = UnixSocketConnection::new(String::from("./temp-5.sock"));
+
+	// Listen for unix socket connections
+	let socket = UnixListener::bind("./temp-5.sock").await?;
+	let mut incoming = socket.incoming();
+	let _ = incoming.next();
+
+	connection.setup_connection().await.unwrap();
+	connection.setup_connection().await.unwrap();
+
+	Ok(())
+}

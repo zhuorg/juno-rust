@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub struct UnixSocketConnection {
+	connection_setup: bool,
 	read_data_receiver: Option<UnboundedReceiver<Vec<u8>>>,
 	write_data_sender: Option<UnboundedSender<Vec<u8>>>,
 	close_sender: Option<UnboundedSender<()>>,
@@ -25,6 +26,7 @@ pub struct UnixSocketConnection {
 impl UnixSocketConnection {
 	pub fn new(socket_path: String) -> Self {
 		UnixSocketConnection {
+			connection_setup: false,
 			read_data_receiver: None,
 			write_data_sender: None,
 			close_sender: None,
@@ -103,6 +105,9 @@ async fn read_data_from_socket(
 #[async_trait]
 impl BaseConnection for UnixSocketConnection {
 	async fn setup_connection(&mut self) -> Result<(), Error> {
+		if self.connection_setup {
+			panic!("Cannot call setup_connection() more than once!");
+		}
 		let (read_data_sender, read_data_receiver) = unbounded::<Vec<u8>>();
 		let (write_data_sender, write_data_receiver) = unbounded::<Vec<u8>>();
 		let (close_sender, close_receiver) = unbounded::<()>();
@@ -124,12 +129,13 @@ impl BaseConnection for UnixSocketConnection {
 			.await;
 		});
 
+		self.connection_setup = true;
 		init_receiver.await.unwrap()
 	}
 
 	async fn close_connection(&mut self) {
-		if self.close_sender.is_none() {
-			println!("Cannot close a connection that hasn't been established yet");
+		if !self.connection_setup || self.close_sender.is_none() {
+			panic!("Cannot close a connection that hasn't been established yet. Did you forget to call setup_connection()?");
 		}
 		let mut sender = &self.close_sender.as_ref().unwrap().clone();
 		if let Err(err) = sender.send(()).await {
@@ -138,8 +144,8 @@ impl BaseConnection for UnixSocketConnection {
 	}
 
 	async fn send(&mut self, buffer: Buffer) {
-		if self.write_data_sender.is_none() {
-			println!("Cannot send data to a connection that hasn't been established yet");
+		if !self.connection_setup || self.write_data_sender.is_none() {
+			panic!("Cannot send data to a connection that hasn't been established yet. Did you forget to await the call to setup_connection()?");
 		}
 		let mut sender = &self.write_data_sender.as_ref().unwrap().clone();
 		if let Err(err) = sender.send(buffer).await {
@@ -148,10 +154,16 @@ impl BaseConnection for UnixSocketConnection {
 	}
 
 	fn get_data_receiver(&mut self) -> UnboundedReceiver<Buffer> {
+		if !self.connection_setup || self.read_data_receiver.is_none() {
+			panic!("Cannot get read sender to a connection that hasn't been established yet. Did you forget to await the call to setup_connection()?");
+		}
 		self.read_data_receiver.take().unwrap()
 	}
 
 	fn clone_write_sender(&self) -> UnboundedSender<Buffer> {
+		if !self.connection_setup || self.write_data_sender.is_none() {
+			panic!("Cannot get write sender of a connection that hasn't been established yet. Did you forget to await the call to setup_connection()?");
+		}
 		self.write_data_sender.as_ref().unwrap().clone()
 	}
 }
