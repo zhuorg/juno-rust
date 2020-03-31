@@ -1,3 +1,8 @@
+use crate::{
+	connection::{BaseConnection, Buffer},
+	utils::Error,
+};
+
 use async_std::{io::BufReader, os::unix::net::UnixStream, prelude::*, task};
 use async_trait::async_trait;
 
@@ -9,11 +14,6 @@ use futures::{
 	future::{self, Either},
 };
 use futures_util::SinkExt;
-
-use crate::{
-	connection::{BaseConnection, Buffer},
-	utils::Error,
-};
 
 pub struct UnixSocketConnection {
 	connection_setup: bool,

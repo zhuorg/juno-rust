@@ -152,7 +152,8 @@ fn should_clone_write_sender_without_setup_and_panic() {
 fn should_setup_connection_twice_and_panic() {
 	let handle = std::thread::spawn(|| {
 		task::block_on(should_setup_connection_twice_and_panic_async()).unwrap();
-	}).join();
+	})
+	.join();
 	task::block_on(remove_file("./temp-5.sock")).unwrap();
 	handle.unwrap();
 }

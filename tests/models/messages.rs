@@ -1,7 +1,5 @@
-use serde_json::{Map, Value};
+use gotham::models::{BaseMessage, Value};
 use std::collections::HashMap;
-
-use gotham::models::BaseMessage;
 
 #[test]
 fn check_types_are_storing_values() {
@@ -18,7 +16,7 @@ fn check_types_are_storing_values() {
 		BaseMessage::FunctionCallRequest {
 			request_id: String::from("request_id"),
 			function: String::from("function"),
-			arguments: Map::new(),
+			arguments: HashMap::new(),
 		},
 		BaseMessage::FunctionCallResponse {
 			request_id: String::from("request_id"),
@@ -78,7 +76,7 @@ fn check_types_are_storing_values() {
 			} => {
 				assert_eq!(request_id, &String::from("request_id"));
 				assert_eq!(function, &String::from("function"));
-				assert_eq!(arguments, &Map::new());
+				assert_eq!(arguments, &HashMap::new());
 			}
 			BaseMessage::FunctionCallResponse { request_id, data } => {
 				assert_eq!(request_id, &String::from("request_id"));

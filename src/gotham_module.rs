@@ -1,9 +1,10 @@
 use crate::{
 	connection::{BaseConnection, Buffer, UnixSocketConnection},
-	models::BaseMessage,
+	models::{BaseMessage, Value},
 	protocol::BaseProtocol,
 	utils::{self, Error, Result},
 };
+use std::collections::HashMap;
 use async_std::{
 	prelude::*,
 	sync::{Arc, Mutex},
@@ -14,11 +15,9 @@ use futures::channel::{
 	oneshot::{channel, Sender},
 };
 use futures_util::sink::SinkExt;
-use serde_json::{Map, Value};
-use std::collections::HashMap;
 
 type ArcRequestList = Arc<Mutex<HashMap<String, Sender<Result<Value>>>>>;
-type ArcFunctionList = Arc<Mutex<HashMap<String, fn(Map<String, Value>) -> Value>>>;
+type ArcFunctionList = Arc<Mutex<HashMap<String, fn(HashMap<String, Value>) -> Value>>>;
 type ArcHookListenerList = Arc<Mutex<HashMap<String, Vec<fn(Value)>>>>;
 
 pub struct GothamModule {
@@ -74,7 +73,7 @@ impl GothamModule {
 	pub async fn declare_function(
 		&mut self,
 		fn_name: String,
-		function: fn(Map<String, Value>) -> Value,
+		function: fn(HashMap<String, Value>) -> Value,
 	) -> Result<()> {
 		self.functions
 			.lock()
@@ -89,7 +88,7 @@ impl GothamModule {
 	pub async fn call_function(
 		&mut self,
 		fn_name: String,
-		args: Map<String, Value>,
+		args: HashMap<String, Value>,
 	) -> Result<Value> {
 		self.ensure_registered()?;
 		let request = self.protocol.call_function(fn_name, args);
@@ -172,8 +171,10 @@ impl GothamModule {
 			}
 		}
 
-		let mut encoded = self.protocol.encode(&request);
-		if self.registered || request.get_type() == 1 {
+		let request_type = request.get_type();
+		let request_id = request.get_request_id().clone();
+		let mut encoded = self.protocol.encode(request);
+		if self.registered || request_type == 1 {
 			self.connection.send(encoded).await;
 		} else {
 			self.message_buffer.append(&mut encoded);
@@ -181,10 +182,7 @@ impl GothamModule {
 
 		let (sender, receiver) = channel::<Result<Value>>();
 
-		self.requests
-			.lock()
-			.await
-			.insert(request.get_request_id().clone(), sender);
+		self.requests.lock().await.insert(request_id, sender);
 
 		match receiver.await {
 			Ok(value) => value,
@@ -213,11 +211,11 @@ async fn on_data_listener(
 			BaseMessage::FunctionCallRequest { .. } => {
 				let result = execute_function_call(message, &functions).await;
 				let write_buffer = match result {
-					Ok(value) => protocol.encode(&BaseMessage::FunctionCallResponse {
+					Ok(value) => protocol.encode(BaseMessage::FunctionCallResponse {
 						request_id: request_id.clone(),
 						data: value,
 					}),
-					Err(error) => protocol.encode(&BaseMessage::Error {
+					Err(error) => protocol.encode(BaseMessage::Error {
 						request_id: request_id.clone(),
 						error: match error {
 							Error::Internal(_) => 0,

@@ -1,11 +1,11 @@
 use crate::{
 	connection::Buffer,
-	models::BaseMessage,
+	models::{BaseMessage, Value as GenericValue},
 	protocol::base_protocol::BaseProtocol,
-	utils::request_keys,
+	utils::{request_keys, request_types},
 };
-use serde_json::{from_slice, json, Result, Value};
 use std::collections::HashMap;
+use serde_json::{from_slice, json, Map, Result, Value};
 
 pub fn default() -> BaseProtocol {
 	BaseProtocol::JsonProtocol {
@@ -22,7 +22,7 @@ pub fn from(other: &BaseProtocol) -> BaseProtocol {
 	}
 }
 
-pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
+pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 	match protocol {
 		BaseProtocol::JsonProtocol { .. } => format!(
 			"{}\n",
@@ -34,7 +34,7 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 					dependencies,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::MODULE_REGISTRATION,
 					request_keys::MODULE_ID: module_id,
 					request_keys::VERSION: version,
 					request_keys::DEPENDENCIES: dependencies,
@@ -42,7 +42,7 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 
 				BaseMessage::RegisterModuleResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::MODULE_REGISTERED,
 				}),
 
 				BaseMessage::FunctionCallRequest {
@@ -51,37 +51,40 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 					arguments,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::FUNCTION_CALL,
 					request_keys::FUNCTION: function,
-					request_keys::ARGUMENTS: arguments,
+					request_keys::ARGUMENTS: generic_hashmap_to_json_map(arguments),
 				}),
 
-				BaseMessage::FunctionCallResponse { request_id, data } => json!({
-					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
-					request_keys::DATA: data,
-				}),
+				BaseMessage::FunctionCallResponse { request_id, data } => {
+					let json_data: Value = data.into();
+					json!({
+						request_keys::REQUEST_ID: request_id,
+						request_keys::TYPE: request_types::FUNCTION_RESPONSE,
+						request_keys::DATA: json_data,
+					})
+				}
 
 				BaseMessage::RegisterHookRequest { request_id, hook } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::REGISTER_HOOK,
 					request_keys::HOOK: hook,
 				}),
 
 				BaseMessage::ListenHookResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::HOOK_REGISTERED,
 				}),
 
 				BaseMessage::TriggerHookRequest { request_id, hook } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::TRIGGER_HOOK,
 					request_keys::HOOK: hook,
 				}),
 
 				BaseMessage::TriggerHookResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::HOOK_TRIGGERED,
 				}),
 
 				BaseMessage::DeclareFunctionRequest {
@@ -89,7 +92,7 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 					function,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::DECLARE_FUNCTION,
 					request_keys::FUNCTION: function,
 				}),
 
@@ -98,19 +101,19 @@ pub fn encode(protocol: &BaseProtocol, req: &BaseMessage) -> Buffer {
 					function,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::FUNCTION_DECLARED,
 					request_keys::FUNCTION: function,
 				}),
 
 				BaseMessage::Unknown { .. } => json!({
 					request_keys::REQUEST_ID: "undefined",
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::ERROR,
 					request_keys::ERROR: 0
 				}),
 
 				BaseMessage::Error { request_id, error } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: req.get_type(),
+					request_keys::TYPE: request_types::ERROR,
 					request_keys::ERROR: error
 				}),
 			}
@@ -153,12 +156,11 @@ fn decode_internal(data: &[u8]) -> Option<BaseMessage> {
 
 		// If dependencies are not null, then populate the dependency_map
 		if let Some(dependencies_map) = dependencies_map {
-			for dependency in dependencies_map.keys() {
-				if !dependencies_map[dependency].is_string() {
+			for dependency in dependencies_map.into_iter() {
+				if !dependencies_map[dependency.0].is_string() {
 					return None;
 				}
-				let dependency_requirement = dependencies_map[dependency].as_str()?.to_string();
-				dependencies.insert(dependency.clone(), dependency_requirement);
+				dependencies.insert(dependency.0.to_string(), dependency.1.as_str()?.to_string());
 			}
 		} else {
 			return None;
@@ -182,13 +184,16 @@ fn decode_internal(data: &[u8]) -> Option<BaseMessage> {
 		Some(BaseMessage::FunctionCallRequest {
 			request_id,
 			function,
-			arguments,
+			arguments: json_map_to_generic_hashmap(arguments),
 		})
 	} else if r#type == 4 {
 		let request_id = result[request_keys::REQUEST_ID].as_str()?.to_string();
 		let data = result[request_keys::DATA].clone();
 
-		Some(BaseMessage::FunctionCallResponse { request_id, data })
+		Some(BaseMessage::FunctionCallResponse {
+			request_id,
+			data: data.into(),
+		})
 	} else if r#type == 5 {
 		let request_id = result[request_keys::REQUEST_ID].as_str()?.to_string();
 		let hook = result[request_keys::HOOK].as_str()?.to_string();
@@ -228,4 +233,20 @@ fn decode_internal(data: &[u8]) -> Option<BaseMessage> {
 			request_id: String::default(),
 		})
 	}
+}
+
+fn json_map_to_generic_hashmap(map: Map<String, Value>) -> HashMap<String, GenericValue> {
+	let mut hashmap = HashMap::new();
+	for key in map.keys() {
+		hashmap.insert(key.clone(), map.get(key).unwrap().clone().into());
+	}
+	hashmap
+}
+
+fn generic_hashmap_to_json_map(hashmap: HashMap<String, GenericValue>) -> Map<String, Value> {
+	let mut map = Map::new();
+	for key in hashmap.keys() {
+		map.insert(key.clone(), hashmap.get(key).unwrap().clone().into());
+	}
+	map
 }

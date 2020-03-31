@@ -1,7 +1,9 @@
+use async_std::task;
+use gotham::{models::Value, GothamModule};
+use std::collections::HashMap;
+
 #[test]
 fn sample() {
-	return;
-	/*
 	let module1 = async {
 		let mut module = GothamModule::default(String::from("../gotham.sock"));
 		module
@@ -12,7 +14,7 @@ fn sample() {
 		module
 			.declare_function("print_hello".to_string(), |_| {
 				println!("Hello");
-				serde_json::Value::Null
+				Value::Null
 			})
 			.await
 			.unwrap();
@@ -27,7 +29,7 @@ fn sample() {
 			.await
 			.unwrap();
 		module
-			.call_function("module1.print_hello".to_string(), Map::new())
+			.call_function("module1.print_hello".to_string(), HashMap::new())
 			.await
 			.unwrap();
 		loop {
@@ -35,5 +37,4 @@ fn sample() {
 		}
 	};
 	task::block_on(futures::future::join(module1, module2));
-	*/
 }

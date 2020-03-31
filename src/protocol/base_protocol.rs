@@ -1,11 +1,13 @@
+use crate::{
+	connection::Buffer,
+	models::{BaseMessage, Value},
+	protocol::json_protocol,
+};
+
 use std::{
 	collections::HashMap,
 	time::{SystemTime, UNIX_EPOCH},
 };
-
-use crate::{connection::Buffer, models::BaseMessage, protocol::json_protocol};
-
-use serde_json::{Map, Value};
 
 pub enum BaseProtocol {
 	JsonProtocol { module_id: String },
@@ -87,7 +89,11 @@ impl BaseProtocol {
 		}
 	}
 
-	pub fn call_function(&self, function: String, arguments: Map<String, Value>) -> BaseMessage {
+	pub fn call_function(
+		&self,
+		function: String,
+		arguments: HashMap<String, Value>,
+	) -> BaseMessage {
 		BaseMessage::FunctionCallRequest {
 			request_id: self.generate_request_id(),
 			function,
@@ -95,7 +101,7 @@ impl BaseProtocol {
 		}
 	}
 
-	pub fn encode(&self, req: &BaseMessage) -> Buffer {
+	pub fn encode(&self, req: BaseMessage) -> Buffer {
 		match self {
 			BaseProtocol::JsonProtocol { .. } => json_protocol::encode(&self, req),
 			_ => panic!("Currently, only JsonProtocol is supported"),

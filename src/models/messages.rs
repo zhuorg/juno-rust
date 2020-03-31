@@ -1,5 +1,4 @@
-use serde_json::{Map, Value};
-
+use crate::{models::Value, utils::request_types};
 use std::collections::HashMap;
 
 pub enum BaseMessage {
@@ -15,7 +14,7 @@ pub enum BaseMessage {
 	FunctionCallRequest {
 		request_id: String,
 		function: String,
-		arguments: Map<String, Value>,
+		arguments: HashMap<String, Value>,
 	},
 	FunctionCallResponse {
 		request_id: String,
@@ -55,8 +54,8 @@ pub enum BaseMessage {
 impl BaseMessage {
 	pub fn get_type(&self) -> u64 {
 		match &self {
-			BaseMessage::Unknown { .. } | BaseMessage::Error { .. } => 0,
-			BaseMessage::RegisterModuleRequest { .. } => 1,
+			BaseMessage::Unknown { .. } | BaseMessage::Error { .. } => request_types::ERROR,
+			BaseMessage::RegisterModuleRequest { .. } => request_types::MODULE_REGISTRATION,
 			BaseMessage::RegisterModuleResponse { .. } => 2,
 			BaseMessage::FunctionCallRequest { .. } => 3,
 			BaseMessage::FunctionCallResponse { .. } => 4,
