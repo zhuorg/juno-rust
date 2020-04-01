@@ -4,11 +4,11 @@ use std::{collections::HashMap, convert::From};
 impl From<serde_json::Number> for Number {
 	fn from(value: serde_json::Number) -> Self {
 		if value.is_f64() {
-			return Number::Decimal(value.as_f64().unwrap());
+			Number::Decimal(value.as_f64().unwrap())
 		} else if value.is_i64() {
-			return Number::SignedInteger(value.as_i64().unwrap().into());
+			Number::SignedInteger(value.as_i64().unwrap())
 		} else {
-			return Number::UnsignedInteger(value.as_u64().unwrap().into());
+			Number::UnsignedInteger(value.as_u64().unwrap())
 		}
 	}
 }
