@@ -17,6 +17,7 @@ use async_std::task;
 use gotham::{models::Value, GothamModule};
 use std::{time::Duration, collections::HashMap};
 
+#[async_std::main]
 async fn main() {
     let mut module = GothamModule::default(String::from("../path/to/gotham.sock"));
     module
