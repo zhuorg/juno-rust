@@ -1,5 +1,5 @@
 use crate::{
-	connection::{BaseConnection, Buffer},
+	connection::{BaseConnection, Buffer, InetSocketConnection},
 	models::{BaseMessage, Value},
 	protocol::BaseProtocol,
 	utils::{self, Error, Result},
@@ -7,8 +7,6 @@ use crate::{
 
 #[cfg(target_family = "unix")]
 use crate::connection::UnixSocketConnection;
-#[cfg(target_family = "windows")]
-use crate::connection::InetSocketConnection;
 
 use std::collections::HashMap;
 use async_std::{
@@ -51,10 +49,22 @@ impl GothamModule {
 	}
 
 	#[cfg(target_family = "windows")]
-	pub fn default(port: String) -> Self {
+	pub fn default(port: u16) -> Self {
 		GothamModule {
 			protocol: BaseProtocol::default(),
-			connection: Box::new(InetSocketConnection::new(port)),
+			connection: Box::new(InetSocketConnection::new(format!("127.0.0.1:{}", port))),
+			requests: Arc::new(Mutex::new(HashMap::new())),
+			functions: Arc::new(Mutex::new(HashMap::new())),
+			hook_listeners: Arc::new(Mutex::new(HashMap::new())),
+			message_buffer: vec![],
+			registered: false,
+		}
+	}
+
+	pub fn with_inet_socket(socket: String) -> Self {
+		GothamModule {
+			protocol: BaseProtocol::default(),
+			connection: Box::new(InetSocketConnection::new(socket)),
 			requests: Arc::new(Mutex::new(HashMap::new())),
 			functions: Arc::new(Mutex::new(HashMap::new())),
 			hook_listeners: Arc::new(Mutex::new(HashMap::new())),
