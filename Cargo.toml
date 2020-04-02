@@ -5,8 +5,8 @@ name = "gotham"
 version = "0.1.0"
 license = "MIT"
 description = "A helper rust library for the gotham microservices framework"
-homepage = "github.com/bytesonus/gotham-rust"
-repository = "github.com/bytesonus/gotham-rust"
+homepage = "https://github.com/bytesonus/gotham-rust"
+repository = "https://github.com/bytesonus/gotham-rust"
 
 [dependencies]
 async-std = "1.4.0"
