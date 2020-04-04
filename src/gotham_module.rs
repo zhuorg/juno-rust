@@ -1,3 +1,9 @@
+extern crate async_std;
+extern crate clap;
+extern crate futures;
+extern crate futures_util;
+extern crate serde_json;
+
 use crate::{
 	connection::{BaseConnection, Buffer, InetSocketConnection},
 	models::{BaseMessage, Value},
@@ -8,17 +14,18 @@ use crate::{
 #[cfg(target_family = "unix")]
 use crate::connection::UnixSocketConnection;
 
-use std::collections::HashMap;
 use async_std::{
 	prelude::*,
 	sync::{Arc, Mutex},
 	task,
 };
+use clap::{App, Arg};
 use futures::channel::{
 	mpsc::{UnboundedReceiver, UnboundedSender},
 	oneshot::{channel, Sender},
 };
 use futures_util::sink::SinkExt;
+use std::collections::HashMap;
 
 type ArcRequestList = Arc<Mutex<HashMap<String, Sender<Result<Value>>>>>;
 type ArcFunctionList = Arc<Mutex<HashMap<String, fn(HashMap<String, Value>) -> Value>>>;
@@ -35,24 +42,103 @@ pub struct GothamModule {
 }
 
 impl GothamModule {
-	#[cfg(target_family = "unix")]
-	pub fn default(socket_path: String) -> Self {
-		GothamModule {
-			protocol: BaseProtocol::default(),
-			connection: Box::new(UnixSocketConnection::new(socket_path)),
-			requests: Arc::new(Mutex::new(HashMap::new())),
-			functions: Arc::new(Mutex::new(HashMap::new())),
-			hook_listeners: Arc::new(Mutex::new(HashMap::new())),
-			message_buffer: vec![],
-			registered: false,
+	#[allow(clippy::collapsible_if)]
+	pub fn from_cli_args() -> Self {
+		let args = App::new(utils::APP_NAME)
+			.version(utils::APP_VERSION)
+			.author(utils::APP_AUTHORS)
+			.about("Micro-services framework")
+			.arg(
+				Arg::with_name("socket-location")
+					.conflicts_with("port")
+					.conflicts_with("host")
+					.short("s")
+					.long("socket-location")
+					.takes_value(true)
+					.value_name("FILE")
+					.help("Sets the location of the socket to connect"),
+			)
+			.arg(
+				Arg::with_name("port")
+					.conflicts_with("socket-location")
+					.short("p")
+					.long("port")
+					.takes_value(true)
+					.value_name("PORT")
+					.help("Sets the port for the socket to connect to"),
+			)
+			.arg(
+				Arg::with_name("host")
+					.conflicts_with("socket-location")
+					.short("h")
+					.long("host")
+					.takes_value(true)
+					.value_name("HOST-IP")
+					.help("Sets the host address for the socket to connect"),
+			)
+			.arg(
+				Arg::with_name("V")
+					.short("V")
+					.multiple(true)
+					.help("Sets the level of verbosity (max 3)"),
+			)
+			.arg(
+				Arg::with_name("version")
+					.short("v")
+					.long("version")
+					.help("Prints version information"),
+			)
+			.get_matches();
+
+		if args.is_present("version") {
+			println!("{}", utils::APP_VERSION);
+			panic!();
+		}
+
+		let mut default_socket_location = std::env::current_dir().unwrap();
+		default_socket_location.push(args.value_of("socket-location").unwrap_or("../gotham.sock"));
+		let default_socket_location = default_socket_location.as_os_str().to_str().unwrap();
+
+		if cfg!(target_family = "windows") {
+			if args.value_of("socket-location").is_some() {
+				panic!("Listening on unix sockets are not supported on windows");
+			} else {
+				GothamModule::from_inet_socket(
+					args.value_of("host").unwrap_or("127.0.0.1"),
+					args.value_of("port")
+						.unwrap_or("2203")
+						.parse::<u16>()
+						.unwrap(),
+				)
+			}
+		} else {
+			if args.value_of("port").is_some() {
+				GothamModule::from_inet_socket(
+					args.value_of("host").unwrap_or("127.0.0.1"),
+					args.value_of("port")
+						.unwrap_or("2203")
+						.parse::<u16>()
+						.unwrap(),
+				)
+			} else {
+				GothamModule::from_unix_socket(
+					args.value_of("socket-location")
+						.unwrap_or(default_socket_location),
+				)
+			}
 		}
 	}
 
 	#[cfg(target_family = "windows")]
-	pub fn default(port: u16) -> Self {
+	pub fn from_unix_socket(socket_path: &str) -> Self {
+		panic!("Unix sockets are not supported on windows");
+	}
+
+	#[cfg(target_family = "unix")]
+	pub fn from_unix_socket(socket_path: &str) -> Self {
 		GothamModule {
 			protocol: BaseProtocol::default(),
-			connection: Box::new(InetSocketConnection::new(format!("127.0.0.1:{}", port))),
+			connection: Box::new(UnixSocketConnection::new(socket_path.to_string())),
 			requests: Arc::new(Mutex::new(HashMap::new())),
 			functions: Arc::new(Mutex::new(HashMap::new())),
 			hook_listeners: Arc::new(Mutex::new(HashMap::new())),
@@ -61,10 +147,10 @@ impl GothamModule {
 		}
 	}
 
-	pub fn with_inet_socket(socket: String) -> Self {
+	pub fn from_inet_socket(host: &str, port: u16) -> Self {
 		GothamModule {
 			protocol: BaseProtocol::default(),
-			connection: Box::new(InetSocketConnection::new(socket)),
+			connection: Box::new(InetSocketConnection::new(format!("{}:{}", host, port))),
 			requests: Arc::new(Mutex::new(HashMap::new())),
 			functions: Arc::new(Mutex::new(HashMap::new())),
 			hook_listeners: Arc::new(Mutex::new(HashMap::new())),
@@ -87,13 +173,15 @@ impl GothamModule {
 
 	pub async fn initialize(
 		&mut self,
-		module_id: String,
-		version: String,
+		module_id: &str,
+		version: &str,
 		dependencies: HashMap<String, String>,
 	) -> Result<()> {
 		self.setup_connections().await?;
 
-		let request = self.protocol.initialize(module_id, version, dependencies);
+		let request =
+			self.protocol
+				.initialize(String::from(module_id), String::from(version), dependencies);
 		self.send_request(request).await?;
 
 		self.registered = true;
@@ -102,9 +190,10 @@ impl GothamModule {
 
 	pub async fn declare_function(
 		&mut self,
-		fn_name: String,
+		fn_name: &str,
 		function: fn(HashMap<String, Value>) -> Value,
 	) -> Result<()> {
+		let fn_name = fn_name.to_string();
 		self.functions
 			.lock()
 			.await
@@ -117,15 +206,17 @@ impl GothamModule {
 
 	pub async fn call_function(
 		&mut self,
-		fn_name: String,
+		fn_name: &str,
 		args: HashMap<String, Value>,
 	) -> Result<Value> {
+		let fn_name = fn_name.to_string();
 		self.ensure_registered()?;
 		let request = self.protocol.call_function(fn_name, args);
 		self.send_request(request).await
 	}
 
-	pub async fn register_hook(&mut self, hook: String, callback: fn(Value)) -> Result<()> {
+	pub async fn register_hook(&mut self, hook: &str, callback: fn(Value)) -> Result<()> {
+		let hook = hook.to_string();
 		self.ensure_registered()?;
 		let mut hook_listeners = self.hook_listeners.lock().await;
 		if hook_listeners.contains_key(&hook) {
@@ -140,7 +231,8 @@ impl GothamModule {
 		Ok(())
 	}
 
-	pub async fn trigger_hook(&mut self, hook: String) -> Result<()> {
+	pub async fn trigger_hook(&mut self, hook: &str) -> Result<()> {
+		let hook = hook.to_string();
 		let request = self.protocol.trigger_hook(hook);
 		self.send_request(request).await?;
 		Ok(())

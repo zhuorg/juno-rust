@@ -9,11 +9,12 @@ homepage = "https://github.com/bytesonus/gotham-rust"
 repository = "https://github.com/bytesonus/gotham-rust"
 
 [dependencies]
-async-std = "1.4.0"
+async-std = "1.5.0"
 serde_json = "*"
 async-trait = "0.1.24"
 futures = "0.3.4"
 futures-util = "0.3.4"
+clap = "2.33.0"
 
 [profile.release]
 lto = true

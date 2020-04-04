@@ -5,14 +5,14 @@ use std::collections::HashMap;
 #[test]
 fn sample() {
 	let module1 = async {
-		let mut module = GothamModule::default(String::from("../gotham.sock"));
+		let mut module = GothamModule::from_unix_socket("../gotham.sock");
 		module
-			.initialize("module1".to_string(), "1.0.0".to_string(), HashMap::new())
+			.initialize("module1", "1.0.0", HashMap::new())
 			.await
 			.unwrap();
 		println!("initialized");
 		module
-			.declare_function("print_hello".to_string(), |_| {
+			.declare_function("print_hello", |_| {
 				println!("Hello");
 				Value::Null
 			})
@@ -23,13 +23,13 @@ fn sample() {
 		}
 	};
 	let module2 = async {
-		let mut module = GothamModule::default(String::from("../gotham.sock"));
+		let mut module = GothamModule::from_unix_socket("../gotham.sock");
 		module
-			.initialize("module2".to_string(), "1.0.0".to_string(), HashMap::new())
+			.initialize("module2", "1.0.0", HashMap::new())
 			.await
 			.unwrap();
 		module
-			.call_function("module1.print_hello".to_string(), HashMap::new())
+			.call_function("module1.print_hello", HashMap::new())
 			.await
 			.unwrap();
 		loop {

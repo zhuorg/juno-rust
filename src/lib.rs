@@ -1,8 +1,3 @@
-extern crate async_std;
-extern crate futures;
-extern crate futures_util;
-extern crate serde_json;
-
 mod gotham_module;
 mod utils;
 
