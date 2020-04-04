@@ -19,25 +19,25 @@ use std::{time::Duration, collections::HashMap};
 
 #[async_std::main]
 async fn main() {
-    let mut module = GothamModule::default(String::from("../path/to/gotham.sock"));
+    let mut module = GothamModule::default("./path/to/gotham.sock");
+    // The hashmap below is used to mark dependencies
     module
-        .initialize("module-name".to_string(), "1.0.0".to_string(), HashMap::new())
+        .initialize("module-name", "1.0.0", HashMap::new())
         .await
         .unwrap();
-    // The hashmap is used to mark dependencies
     println!("Initialized!");
     module
-        .declare_function("print_hello".to_string(), |args| {
+        .declare_function("print_hello", |args| {
             println!("Hello");
             Value::Null
         })
         .await
         .unwrap();
+    // The HashMap::new() below marks the arguments passed to the function
     module
-        .call_function("module2.print_hello_world".to_string(), HashMap::new())
+        .call_function("module2.print_hello_world", HashMap::new())
         .await
         .unwrap();
-    // The HashMap::new() here marks the arguments passed to the function
     loop {
         task::sleep(Duration::from_millis(1000)).await;
     }
