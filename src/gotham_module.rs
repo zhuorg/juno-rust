@@ -3,6 +3,8 @@ extern crate futures;
 extern crate futures_util;
 extern crate serde_json;
 
+pub use serde_json::json;
+
 use crate::{
 	connection::{BaseConnection, Buffer, InetSocketConnection},
 	models::{BaseMessage, Value},
@@ -275,7 +277,7 @@ async fn on_data_listener(
 				}
 				Ok(Value::Null)
 			}
-			BaseMessage::TriggerHookResponse { .. } => {
+			BaseMessage::TriggerHookRequest { .. } => {
 				execute_hook_triggered(message, &hook_listeners).await
 			}
 			BaseMessage::Error { error, .. } => Err(Error::FromGotham(error)),
@@ -323,7 +325,7 @@ async fn execute_hook_triggered(
 			listener(Value::Null);
 		}
 	} else {
-		panic!("Cannot execute function from a request that wasn't a FunctionCallRequest!");
+		panic!("Cannot execute hook from a request that wasn't a TriggerHookRequest!");
 	}
 	Ok(Value::Null)
 }
