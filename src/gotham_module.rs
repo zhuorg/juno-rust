@@ -48,8 +48,7 @@ impl GothamModule {
 	pub fn default(connection_path: &str) -> Self {
 		let is_ip: std::result::Result<SocketAddr, AddrParseError> =
 			connection_path.to_string().parse();
-		if is_ip.is_ok() {
-			let ip = is_ip.unwrap();
+		if let Ok(ip) = is_ip {
 			Self::from_inet_socket(&format!("{}", ip.ip()), ip.port())
 		} else {
 			Self::from_unix_socket(connection_path)
