@@ -1,11 +1,11 @@
 use async_std::task;
-use gotham::{models::Value, GothamModule};
+use juno::{models::Value, JunoModule};
 use std::collections::HashMap;
 
 #[test]
 fn sample() {
 	let module1 = async {
-		let mut module = GothamModule::from_unix_socket("../gotham.sock");
+		let mut module = JunoModule::from_unix_socket("../juno.sock");
 		module
 			.initialize("module1", "1.0.0", HashMap::new())
 			.await
@@ -23,7 +23,7 @@ fn sample() {
 		}
 	};
 	let module2 = async {
-		let mut module = GothamModule::from_unix_socket("../gotham.sock");
+		let mut module = JunoModule::from_unix_socket("../juno.sock");
 		module
 			.initialize("module2", "1.0.0", HashMap::new())
 			.await

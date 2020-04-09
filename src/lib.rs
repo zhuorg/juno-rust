@@ -1,4 +1,4 @@
-mod gotham_module;
+mod juno_module;
 mod utils;
 
 pub mod connection;
@@ -8,5 +8,5 @@ pub mod protocol;
 #[macro_use]
 pub mod macros;
 
-pub use gotham_module::json;
-pub use gotham_module::GothamModule;
+pub use juno_module::json;
+pub use juno_module::JunoModule;

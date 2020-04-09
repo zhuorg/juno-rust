@@ -34,7 +34,7 @@ type ArcRequestList = Arc<Mutex<HashMap<String, Sender<Result<Value>>>>>;
 type ArcFunctionList = Arc<Mutex<HashMap<String, fn(HashMap<String, Value>) -> Value>>>;
 type ArcHookListenerList = Arc<Mutex<HashMap<String, Vec<fn(Value)>>>>;
 
-pub struct GothamModule {
+pub struct JunoModule {
 	protocol: BaseProtocol,
 	connection: Box<dyn BaseConnection>,
 	requests: ArcRequestList,
@@ -44,7 +44,7 @@ pub struct GothamModule {
 	registered: bool,
 }
 
-impl GothamModule {
+impl JunoModule {
 	pub fn default(connection_path: &str) -> Self {
 		let is_ip: std::result::Result<SocketAddr, AddrParseError> =
 			connection_path.to_string().parse();
@@ -62,7 +62,7 @@ impl GothamModule {
 
 	#[cfg(target_family = "unix")]
 	pub fn from_unix_socket(socket_path: &str) -> Self {
-		GothamModule {
+		JunoModule {
 			protocol: BaseProtocol::default(),
 			connection: Box::new(UnixSocketConnection::new(socket_path.to_string())),
 			requests: Arc::new(Mutex::new(HashMap::new())),
@@ -74,7 +74,7 @@ impl GothamModule {
 	}
 
 	pub fn from_inet_socket(host: &str, port: u16) -> Self {
-		GothamModule {
+		JunoModule {
 			protocol: BaseProtocol::default(),
 			connection: Box::new(InetSocketConnection::new(format!("{}:{}", host, port))),
 			requests: Arc::new(Mutex::new(HashMap::new())),
@@ -86,7 +86,7 @@ impl GothamModule {
 	}
 
 	pub fn new(protocol: BaseProtocol, connection: Box<dyn BaseConnection>) -> Self {
-		GothamModule {
+		JunoModule {
 			protocol,
 			connection,
 			requests: Arc::new(Mutex::new(HashMap::new())),
@@ -267,7 +267,7 @@ async fn on_data_listener(
 						request_id: request_id.clone(),
 						error: match error {
 							Error::Internal(_) => 0,
-							Error::FromGotham(error_code) => error_code,
+							Error::FromJuno(error_code) => error_code,
 						},
 					}),
 				};
@@ -279,7 +279,7 @@ async fn on_data_listener(
 			BaseMessage::TriggerHookRequest { .. } => {
 				execute_hook_triggered(message, &hook_listeners).await
 			}
-			BaseMessage::Error { error, .. } => Err(Error::FromGotham(error)),
+			BaseMessage::Error { error, .. } => Err(Error::FromJuno(error)),
 			_ => Ok(Value::Null),
 		};
 
@@ -303,7 +303,7 @@ async fn execute_function_call(message: BaseMessage, functions: &ArcFunctionList
 	{
 		let functions = functions.lock().await;
 		if !functions.contains_key(&function) {
-			return Err(Error::FromGotham(utils::errors::UNKNOWN_FUNCTION));
+			return Err(Error::FromJuno(utils::errors::UNKNOWN_FUNCTION));
 		}
 		Ok(functions[&function](arguments))
 	} else {

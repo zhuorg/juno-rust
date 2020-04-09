@@ -1,6 +1,6 @@
-# Gotham Rust
+# Juno Rust
 
-This is a library that provides you with helper methods for interfacing with the microservices framework, [gotham](https://github.com/bytesonus/gotham).
+This is a library that provides you with helper methods for interfacing with the microservices framework, [juno](https://github.com/bytesonus/juno).
 
 ## How to use:
 
@@ -14,12 +14,12 @@ For all other basic needs, you can get away without worrying about any of that.
 
 ```rust
 use async_std::task;
-use gotham::{models::Value, GothamModule};
+use juno::{models::Value, JunoModule};
 use std::{time::Duration, collections::HashMap};
 
 #[async_std::main]
 async fn main() {
-    let mut module = GothamModule::default("./path/to/gotham.sock");
+    let mut module = JunoModule::default("./path/to/juno.sock");
     // The hashmap below is used to mark dependencies
     module
         .initialize("module-name", "1.0.0", HashMap::new())

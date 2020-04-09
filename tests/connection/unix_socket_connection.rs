@@ -1,6 +1,6 @@
 use async_std::{fs::remove_file, io::Result, os::unix::net::UnixListener, prelude::*, task};
 use futures_util::sink::SinkExt;
-use gotham::connection::{BaseConnection, UnixSocketConnection};
+use juno::connection::{BaseConnection, UnixSocketConnection};
 
 #[test]
 fn connection_object_should_create_successfully() {

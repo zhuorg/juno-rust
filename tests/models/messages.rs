@@ -1,4 +1,4 @@
-use gotham::models::{BaseMessage, Value};
+use juno::models::{BaseMessage, Value};
 use std::collections::HashMap;
 
 #[test]
