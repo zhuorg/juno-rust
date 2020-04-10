@@ -24,7 +24,7 @@ pub enum BaseMessage {
 		request_id: String,
 		hook: String,
 	},
-	ListenHookResponse {
+	RegisterHookResponse {
 		request_id: String,
 	},
 	TriggerHookRequest {
@@ -55,12 +55,12 @@ impl BaseMessage {
 	pub fn get_type(&self) -> u64 {
 		match &self {
 			BaseMessage::Unknown { .. } | BaseMessage::Error { .. } => request_types::ERROR,
-			BaseMessage::RegisterModuleRequest { .. } => request_types::MODULE_REGISTRATION,
-			BaseMessage::RegisterModuleResponse { .. } => 2,
+			BaseMessage::RegisterModuleRequest { .. } => request_types::REGISTER_MODULE_REQUEST,
+			BaseMessage::RegisterModuleResponse { .. } => request_types::REGISTER_MODULE_RESPONSE,
 			BaseMessage::FunctionCallRequest { .. } => 3,
 			BaseMessage::FunctionCallResponse { .. } => 4,
 			BaseMessage::RegisterHookRequest { .. } => 5,
-			BaseMessage::ListenHookResponse { .. } => 6,
+			BaseMessage::RegisterHookResponse { .. } => 6,
 			BaseMessage::TriggerHookRequest { .. } => 7,
 			BaseMessage::TriggerHookResponse { .. } => 8,
 			BaseMessage::DeclareFunctionRequest { .. } => 9,
@@ -77,7 +77,7 @@ impl BaseMessage {
 			BaseMessage::FunctionCallRequest { request_id, .. } => request_id,
 			BaseMessage::FunctionCallResponse { request_id, .. } => request_id,
 			BaseMessage::RegisterHookRequest { request_id, .. } => request_id,
-			BaseMessage::ListenHookResponse { request_id, .. } => request_id,
+			BaseMessage::RegisterHookResponse { request_id, .. } => request_id,
 			BaseMessage::TriggerHookRequest { request_id, .. } => request_id,
 			BaseMessage::TriggerHookResponse { request_id, .. } => request_id,
 			BaseMessage::DeclareFunctionRequest { request_id, .. } => request_id,

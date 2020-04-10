@@ -34,7 +34,7 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 					dependencies,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::MODULE_REGISTRATION,
+					request_keys::TYPE: request_types::REGISTER_MODULE_REQUEST,
 					request_keys::MODULE_ID: module_id,
 					request_keys::VERSION: version,
 					request_keys::DEPENDENCIES: dependencies,
@@ -42,7 +42,7 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 
 				BaseMessage::RegisterModuleResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::MODULE_REGISTERED,
+					request_keys::TYPE: request_types::REGISTER_MODULE_RESPONSE,
 				}),
 
 				BaseMessage::FunctionCallRequest {
@@ -51,7 +51,7 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 					arguments,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::FUNCTION_CALL,
+					request_keys::TYPE: request_types::FUNCTION_CALL_REQUEST,
 					request_keys::FUNCTION: function,
 					request_keys::ARGUMENTS: generic_hashmap_to_json_map(arguments),
 				}),
@@ -60,31 +60,31 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 					let json_data: Value = data.into();
 					json!({
 						request_keys::REQUEST_ID: request_id,
-						request_keys::TYPE: request_types::FUNCTION_RESPONSE,
+						request_keys::TYPE: request_types::FUNCTION_CALL_RESPONSE,
 						request_keys::DATA: json_data,
 					})
 				}
 
 				BaseMessage::RegisterHookRequest { request_id, hook } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::REGISTER_HOOK,
+					request_keys::TYPE: request_types::REGISTER_HOOK_REQUEST,
 					request_keys::HOOK: hook,
 				}),
 
-				BaseMessage::ListenHookResponse { request_id } => json!({
+				BaseMessage::RegisterHookResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::HOOK_REGISTERED,
+					request_keys::TYPE: request_types::REGISTER_HOOK_RESPONSE,
 				}),
 
 				BaseMessage::TriggerHookRequest { request_id, hook } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::TRIGGER_HOOK,
+					request_keys::TYPE: request_types::TRIGGER_HOOK_REQUEST,
 					request_keys::HOOK: hook,
 				}),
 
 				BaseMessage::TriggerHookResponse { request_id } => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::HOOK_TRIGGERED,
+					request_keys::TYPE: request_types::TRIGGER_HOOK_RESPONSE,
 				}),
 
 				BaseMessage::DeclareFunctionRequest {
@@ -92,7 +92,7 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 					function,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::DECLARE_FUNCTION,
+					request_keys::TYPE: request_types::DECLARE_FUNCTION_REQUEST,
 					request_keys::FUNCTION: function,
 				}),
 
@@ -101,7 +101,7 @@ pub fn encode(protocol: &BaseProtocol, req: BaseMessage) -> Buffer {
 					function,
 				} => json!({
 					request_keys::REQUEST_ID: request_id,
-					request_keys::TYPE: request_types::FUNCTION_DECLARED,
+					request_keys::TYPE: request_types::DECLARE_FUNCTION_RESPONSE,
 					request_keys::FUNCTION: function,
 				}),
 
@@ -202,7 +202,7 @@ fn decode_internal(data: &[u8]) -> Option<BaseMessage> {
 	} else if r#type == 6 {
 		let request_id = result[request_keys::REQUEST_ID].as_str()?.to_string();
 
-		Some(BaseMessage::ListenHookResponse { request_id })
+		Some(BaseMessage::RegisterHookResponse { request_id })
 	} else if r#type == 7 {
 		let request_id = result[request_keys::REQUEST_ID].as_str()?.to_string();
 		let hook = result[request_keys::HOOK].as_str()?.to_string();
