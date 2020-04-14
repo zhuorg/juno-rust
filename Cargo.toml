@@ -7,6 +7,7 @@ license = "MIT"
 description = "A helper rust library for the juno microservices framework"
 homepage = "https://github.com/bytesonus/juno-rust"
 repository = "https://github.com/bytesonus/juno-rust"
+readme = "README.md"
 
 [dependencies]
 async-std = "1.5.0"
