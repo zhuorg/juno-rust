@@ -2,9 +2,59 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
-	SignedInteger(i64),
-	UnsignedInteger(u64),
-	Decimal(f64),
+	PosInt(u64),
+	NegInt(i64),
+	Float(f64),
+}
+
+impl Number {
+	pub fn is_i64(&self) -> bool {
+		if let Number::NegInt(_) = self {
+			true
+		} else {
+			false
+		}
+	}
+
+	pub fn as_i64(&self) -> Option<i64> {
+		if let Number::NegInt(num) = self {
+			Some(*num)
+		} else {
+			None
+		}
+	}
+
+	pub fn is_u64(&self) -> bool {
+		if let Number::PosInt(_) = self {
+			true
+		} else {
+			false
+		}
+	}
+
+	pub fn as_u64(&self) -> Option<u64> {
+		if let Number::PosInt(num) = self {
+			Some(*num)
+		} else {
+			None
+		}
+	}
+
+	pub fn is_f64(&self) -> bool {
+		if let Number::Float(_) = self {
+			true
+		} else {
+			false
+		}
+	}
+
+	pub fn as_f64(&self) -> Option<f64> {
+		if let Number::Float(num) = self {
+			Some(*num)
+		} else {
+			None
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq)]

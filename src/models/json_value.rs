@@ -4,11 +4,11 @@ use std::{collections::HashMap, convert::From};
 impl From<serde_json::Number> for Number {
 	fn from(value: serde_json::Number) -> Self {
 		if value.is_f64() {
-			Number::Decimal(value.as_f64().unwrap())
+			Number::Float(value.as_f64().unwrap())
 		} else if value.is_i64() {
-			Number::SignedInteger(value.as_i64().unwrap())
+			Number::NegInt(value.as_i64().unwrap())
 		} else {
-			Number::UnsignedInteger(value.as_u64().unwrap())
+			Number::PosInt(value.as_u64().unwrap())
 		}
 	}
 }
@@ -16,9 +16,9 @@ impl From<serde_json::Number> for Number {
 impl Into<serde_json::Number> for Number {
 	fn into(self) -> serde_json::Number {
 		match self {
-			Number::SignedInteger(s) => serde_json::Number::from(s),
-			Number::UnsignedInteger(u) => serde_json::Number::from(u),
-			Number::Decimal(d) => serde_json::Number::from_f64(d).unwrap(),
+			Number::NegInt(s) => serde_json::Number::from(s),
+			Number::PosInt(u) => serde_json::Number::from(u),
+			Number::Float(d) => serde_json::Number::from_f64(d).unwrap(),
 		}
 	}
 }
