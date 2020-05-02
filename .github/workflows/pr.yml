@@ -63,7 +63,6 @@ jobs:
 #          args: --release --all
 
       - name: Cargo fmt
-        if: matrix.rust == 'nightly'
         uses: actions-rs/cargo@v1
         with:
           command: fmt
