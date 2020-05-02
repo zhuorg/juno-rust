@@ -56,7 +56,7 @@ impl JunoModule {
 	}
 
 	#[cfg(target_family = "windows")]
-	pub fn from_unix_socket(socket_path: &str) -> Self {
+	pub fn from_unix_socket(_: &str) -> Self {
 		panic!("Unix sockets are not supported on windows");
 	}
 

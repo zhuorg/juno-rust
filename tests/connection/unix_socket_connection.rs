@@ -1,4 +1,5 @@
 use async_std::{fs::remove_file, io::Result, os::unix::net::UnixListener, prelude::*, task};
+use futures::future;
 use futures_util::sink::SinkExt;
 use juno::connection::{BaseConnection, UnixSocketConnection};
 
@@ -21,8 +22,9 @@ async fn should_connect_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (..) = futures::future::join(connection_listener, connection.setup_connection()).await;
+	let (..) = future::join(connection_listener, connection.setup_connection()).await;
 
+	drop(socket);
 	remove_file("./temp-1.sock").await?;
 
 	Ok(())
@@ -42,16 +44,19 @@ async fn should_connect_and_send_data_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) =
-		futures::future::join(connection_listener, connection.setup_connection()).await;
-
-	connection.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]).await;
+	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
 
 	let mut read_buffer = [0; 10];
-	stream.unwrap()?.read(&mut read_buffer).await?;
+	let (_, read_result) = futures::future::join(
+		connection.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
+		stream.unwrap()?.read(&mut read_buffer),
+	)
+	.await;
+	read_result?;
 
 	assert_eq!(read_buffer.to_vec(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
+	drop(socket);
 	remove_file("./temp-2.sock").await?;
 
 	Ok(())
@@ -71,16 +76,21 @@ async fn should_connect_and_read_data_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) =
-		futures::future::join(connection_listener, connection.setup_connection()).await;
+	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
 
-	let write_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-	stream.unwrap()?.write_all(write_data.as_slice()).await?;
+	let write_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0, b'\n'];
+	let mut stream = stream.unwrap()?;
 
-	let read_buffer = connection.get_data_receiver().next().await.unwrap();
+	let write_result = stream.write_all(write_data.as_slice()).await;
+	write_result?;
+
+	let mut receiver = connection.get_data_receiver();
+	let read_result = receiver.next().await;
+	let read_buffer = read_result.unwrap();
 
 	assert_eq!(read_buffer, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
+	drop(socket);
 	remove_file("./temp-3.sock").await?;
 
 	Ok(())
@@ -100,20 +110,22 @@ async fn should_connect_and_send_data_from_cloned_sender_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) =
-		futures::future::join(connection_listener, connection.setup_connection()).await;
-
-	connection
-		.clone_write_sender()
-		.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0])
-		.await
-		.unwrap();
+	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
 
 	let mut read_buffer = [0; 10];
-	stream.unwrap()?.read(&mut read_buffer).await?;
+	let (write_result, read_result) = futures::future::join(
+		connection
+			.clone_write_sender()
+			.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
+		stream.unwrap()?.read(&mut read_buffer),
+	)
+	.await;
+	write_result.unwrap();
+	read_result?;
 
 	assert_eq!(read_buffer.to_vec(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
+	drop(socket);
 	remove_file("./temp-4.sock").await?;
 
 	Ok(())
@@ -147,6 +159,7 @@ fn should_clone_write_sender_without_setup_and_panic() {
 	connection.clone_write_sender();
 }
 
+/*
 #[test]
 #[should_panic]
 fn should_setup_connection_twice_and_panic() {
@@ -165,10 +178,12 @@ async fn should_setup_connection_twice_and_panic_async() -> Result<()> {
 	// Listen for unix socket connections
 	let socket = UnixListener::bind("./temp-5.sock").await?;
 	let mut incoming = socket.incoming();
-	let _ = incoming.next();
-
-	connection.setup_connection().await.unwrap();
-	connection.setup_connection().await.unwrap();
+	let (_stream, result) = future::join(incoming.next(), connection.setup_connection()).await;
+	result.unwrap();
+	let (_, result) = future::join(incoming.next(), connection.setup_connection()).await;
+	result.unwrap();
+	drop(socket);
 
 	Ok(())
 }
+*/
