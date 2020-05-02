@@ -8,5 +8,4 @@ pub mod protocol;
 #[macro_use]
 pub mod macros;
 
-pub use juno_module::json;
-pub use juno_module::JunoModule;
+pub use juno_module::{json, JunoModule};
