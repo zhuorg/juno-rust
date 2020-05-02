@@ -1,5 +1,4 @@
 use async_std::{fs::remove_file, io::Result, os::unix::net::UnixListener, prelude::*, task};
-use futures::future;
 use futures_util::sink::SinkExt;
 use juno::connection::{BaseConnection, UnixSocketConnection};
 
@@ -22,7 +21,7 @@ async fn should_connect_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (..) = future::join(connection_listener, connection.setup_connection()).await;
+	let (..) = futures::future::join(connection_listener, connection.setup_connection()).await;
 
 	remove_file("./temp-1.sock").await?;
 
@@ -43,15 +42,13 @@ async fn should_connect_and_send_data_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
+	let (stream, _) =
+		futures::future::join(connection_listener, connection.setup_connection()).await;
+
+	connection.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]).await;
 
 	let mut read_buffer = [0; 10];
-	let (_, read_result) = future::join(
-		connection.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
-		stream.unwrap()?.read(&mut read_buffer),
-	)
-	.await;
-	read_result?;
+	stream.unwrap()?.read(&mut read_buffer).await?;
 
 	assert_eq!(read_buffer.to_vec(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
@@ -74,16 +71,13 @@ async fn should_connect_and_read_data_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
+	let (stream, _) =
+		futures::future::join(connection_listener, connection.setup_connection()).await;
 
 	let write_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-	let (write_action, read_buffer) = future::join(
-		stream.unwrap()?.write_all(write_data.as_slice()),
-		connection.get_data_receiver().next(),
-	)
-	.await;
-	write_action?;
-	let read_buffer = read_buffer.unwrap();
+	stream.unwrap()?.write_all(write_data.as_slice()).await?;
+
+	let read_buffer = connection.get_data_receiver().next().await.unwrap();
 
 	assert_eq!(read_buffer, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
@@ -106,18 +100,17 @@ async fn should_connect_and_send_data_from_cloned_sender_async() -> Result<()> {
 	let mut incoming = socket.incoming();
 	let connection_listener = incoming.next();
 
-	let (stream, _) = future::join(connection_listener, connection.setup_connection()).await;
+	let (stream, _) =
+		futures::future::join(connection_listener, connection.setup_connection()).await;
+
+	connection
+		.clone_write_sender()
+		.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0])
+		.await
+		.unwrap();
 
 	let mut read_buffer = [0; 10];
-	let (write_action, read_action) = future::join(
-		connection
-			.clone_write_sender()
-			.send(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
-		stream.unwrap()?.read(&mut read_buffer),
-	)
-	.await;
-	write_action.unwrap();
-	read_action?;
+	stream.unwrap()?.read(&mut read_buffer).await?;
 
 	assert_eq!(read_buffer.to_vec(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
 
