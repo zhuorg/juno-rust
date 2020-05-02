@@ -73,7 +73,7 @@ jobs:
         id: version_check
 
       - name: Find and Replace
-        run: sed -i -e 's/version = "${{ version }}"/version = "${{ version }}-beta"/g' Cargo.toml
+        run: sed -i -e 's/"${{ version }}"/"${{ version }}-beta"/g' Cargo.toml
 
       - name: Publish Release
         uses: actions-rs/cargo@v1
