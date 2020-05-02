@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
         rust:
           - stable
           - beta
@@ -54,7 +54,7 @@ jobs:
       - name: Publish Release
         uses: actions-rs/cargo@v1
         with:
-          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --dry-run
 
   release-staging:
     if: github.ref == 'refs/heads/staging'
@@ -68,11 +68,11 @@ jobs:
         uses: thebongy/version-check@v1
         with:
           file: Cargo.toml
-          tagFormat: v${version}
+          tagFormat: v${version}-beta
         id: version_check
 
       - name: Publish Release
         uses: actions-rs/cargo@v1
         with:
-          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+          command: sed -i -e 's/${version}/${version}-beta/g' /tmp/file.txt && cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty --dry-run
     

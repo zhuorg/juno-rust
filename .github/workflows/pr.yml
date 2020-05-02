@@ -19,7 +19,7 @@ jobs:
         uses: thebongy/version-check@v1
         with:
           file: Cargo.toml
-          tagFormat: v${version}
+          tagFormat: v${version}-beta
         id: version_check_staging
       
       - name: Check Release Version (master)
@@ -33,7 +33,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
         rust:
           - stable
           - beta
@@ -60,6 +60,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --release --all
 
       - name: Cargo fmt
         uses: actions-rs/cargo@v1
