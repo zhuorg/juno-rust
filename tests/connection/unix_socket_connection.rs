@@ -159,6 +159,7 @@ fn should_clone_write_sender_without_setup_and_panic() {
 	connection.clone_write_sender();
 }
 
+/*
 #[test]
 #[should_panic]
 fn should_setup_connection_twice_and_panic() {
@@ -185,3 +186,4 @@ async fn should_setup_connection_twice_and_panic_async() -> Result<()> {
 
 	Ok(())
 }
+*/
