@@ -73,7 +73,6 @@ jobs:
         id: version_check
 
       - name: Find and Replace
-        runs-on: ubuntu-latest
         run: sed -i -e 's/${version}/${version}-beta/g' Cargo.tml
 
       - name: Publish Release
