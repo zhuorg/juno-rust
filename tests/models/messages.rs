@@ -1,8 +1,7 @@
 use juno::models::{BaseMessage, Value};
 use std::collections::HashMap;
 
-//#[test]
-#[allow(dead_code)]
+#[test]
 fn check_types_are_storing_values() {
 	let messages = [
 		BaseMessage::RegisterModuleRequest {
