@@ -71,8 +71,15 @@ jobs:
           tagFormat: v${version}-beta
         id: version_check
 
+      - name: Find and Replace
+        uses: shitiomatic/str-replace@master
+        with:
+          find: "${version}"
+          replace: "${version}-beta"
+          include: "Cargo.toml"
+
       - name: Publish Release
         uses: actions-rs/cargo@v1
         with:
-          command: sed -i -e 's/${version}/${version}-beta/g' /tmp/file.txt && cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty --dry-run
+          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty --dry-run
     
