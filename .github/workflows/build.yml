@@ -54,7 +54,8 @@ jobs:
       - name: Publish Release
         uses: actions-rs/cargo@v1
         with:
-          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --dry-run
+          command: publish
+          args: --token ${{ secrets.CRATES_IO_TOKEN }} --dry-run
 
   release-staging:
     if: github.ref == 'refs/heads/staging'
@@ -81,5 +82,6 @@ jobs:
       - name: Publish Release
         uses: actions-rs/cargo@v1
         with:
-          command: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty --dry-run
+          command: publish
+          args: --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty --dry-run
     
