@@ -36,7 +36,7 @@ type ArcHookListenerList = Arc<Mutex<HashMap<String, Vec<fn(Value)>>>>;
 
 pub struct JunoModule {
 	protocol: BaseProtocol,
-	connection: Box<dyn BaseConnection>,
+	connection: Box<dyn BaseConnection + Send + Sync>,
 	requests: ArcRequestList,
 	functions: ArcFunctionList,
 	hook_listeners: ArcHookListenerList,
@@ -85,7 +85,7 @@ impl JunoModule {
 		}
 	}
 
-	pub fn new(protocol: BaseProtocol, connection: Box<dyn BaseConnection>) -> Self {
+	pub fn new(protocol: BaseProtocol, connection: Box<dyn BaseConnection + Send + Sync>) -> Self {
 		JunoModule {
 			protocol,
 			connection,

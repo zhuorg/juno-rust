@@ -9,3 +9,4 @@ pub mod protocol;
 pub mod macros;
 
 pub use juno_module::{json, JunoModule};
+pub use utils::{Error, Result};
