@@ -5,7 +5,7 @@ on:
      - staging
      - develop
 
-name: Continuous integration
+name: Continuous integration test
 
 jobs:
   build:
